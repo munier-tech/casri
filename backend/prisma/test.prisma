@@ -1,0 +1,358 @@
+// Prisma schema file for PostgreSQL
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+  USER
+}
+
+enum PaymentMethod {
+  CASH
+  ZAAD
+  EDAHAB
+  CREDIT
+}
+
+enum SaleStatus {
+  PENDING
+  PARTIALLY_PAID
+  COMPLETED
+  CANCELLED
+  REFUNDED
+  OVERDUE
+}
+
+enum ExpenseType {
+  RENT
+  ELECTRICITY
+  SALARIES_AND_WAGES
+  SECURITY
+  REPAIRS_AND_MAINTENANCE
+  MOBILE_MONEY
+  BANK_CHARGE_FEES
+  MARKETING_AND_BRANDING
+  TAXES
+  INTERNET
+  WATER
+  OTHERS
+}
+
+enum ExpenseStatus {
+  PENDING
+  PARTIALLY_PAID
+  FULLY_PAID
+  OVERDUE
+}
+
+model User {
+  id        String    @id @default(cuid())
+  username  String
+  password  String
+  email     String    @unique
+  role      Role      @default(USER)
+
+  products  Product[] @relation("UserProducts")
+  purchases Purchase[]
+  sales     Sale[]
+  loans     Loan[]    @relation("LoanCreatedBy")
+  liabilities Liability[]
+  expenses  Expense[]
+  histories History[]
+
+  // Back-relations for PaymentHistory
+  collectedPayments PaymentHistory[] @relation("CollectedBy")
+
+  // Back-relations for HistoryProduct
+  historyProducts HistoryProduct[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Product {
+  id                String           @id @default(cuid())
+  name              String
+  description       String           @default("")
+  cost              Float
+  price             Float?
+  stock             Int              @default(0)
+  lowStockThreshold Int              @default(5)
+  expiryDate        DateTime?
+  image             String           @default("")
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  users             User[]           @relation("UserProducts")
+  purchases         Purchase[]
+  saleProducts      SaleProduct[]
+  historyProducts   HistoryProduct[]
+}
+
+model Purchase {
+  id                String            @id @default(cuid())
+  supplierName      String
+  total             Float
+  amountDue         Float?            @default(0)
+  amountPaid        Float?            @default(0)
+  paymentMethod     String?           @default("cash")
+  notes             String?           @default("")
+  datePurchased     DateTime          @default(now())
+  productName       String?           @default("")
+  
+  user              User              @relation(fields: [userId], references: [id])
+  userId            String
+
+  vendor            Vendor?           @relation(fields: [vendorId], references: [id])
+  vendorId          String?
+
+  products          PurchaseProduct[]
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+}
+
+model PurchaseProduct {
+  id          String   @id @default(cuid())
+  purchase    Purchase @relation(fields: [purchaseId], references: [id])
+  purchaseId  String
+  product     Product? @relation(fields: [productId], references: [id])
+  productId   String?
+  productName String
+  quantity    Int
+  unitPrice   Float
+  total       Float
+}
+
+
+
+model Vendor {
+  id            String     @id @default(cuid())
+  name          String
+  phoneNumber   String
+  location      String
+  purchases     Purchase[]
+  totalPurchases Float      @default(0)
+  totalAmount   Float       @default(0)
+  balance       Float       @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+// model Sale {
+//   id               String         @id @default(cuid())
+//   saleNumber       String         @unique
+//   products         SaleProduct[]
+//   subtotal         Float
+//   discountPercentage Float       @default(0)
+//   discountAmount   Float          @default(0)
+//   grandTotal       Float
+//   amountDue        Float
+//   amountPaid       Float
+//   remainingBalance Float          @default(0)
+//   paymentMethod    PaymentMethod  @default(CASH)
+//   changeAmount     Float          @default(0)
+//   totalQuantity    Int
+//   user             User           @relation(fields: [userId], references: [id])
+//   userId           String
+//   customerName     String?
+//   customerPhone    String?
+//   notes            String?
+//   status           SaleStatus     @default(PENDING)
+//   paymentHistory   PaymentHistory[]
+//   dueDate          DateTime?
+//   hasDebt          Boolean        @default(false)
+//   debtRecordId     String?        @unique
+//   debtRecord       Debt?          @relation(fields: [debtRecordId], references: [id])
+
+//   createdAt        DateTime       @default(now())
+//   updatedAt        DateTime       @updatedAt
+// }
+
+model SaleProduct {
+  id           String  @id @default(cuid())
+  sale         Sale    @relation(fields: [saleId], references: [id])
+  saleId       String
+  product      Product @relation(fields: [productId], references: [id])
+  productId    String
+  name         String
+  quantity     Int
+  sellingPrice Float
+  discount     Float?   @default(0)
+  itemTotal    Float
+  itemDiscount Float?   @default(0)
+  itemNet      Float
+}
+
+model PaymentHistory {
+  id            String       @id @default(cuid())
+  date          DateTime     @default(now())
+  amount        Float
+  paymentMethod PaymentMethod
+  collectedBy   User?        @relation("CollectedBy", fields: [collectedById], references: [id])
+  collectedById String?
+  notes         String?
+  sale          Sale         @relation(fields: [saleId], references: [id])
+  saleId        String
+}
+
+model Loan {
+  id          String   @id @default(cuid())
+  personName  String
+  productName String
+  amount      Float
+  description String?
+  quantity    Int      @default(1)
+  loanDate    DateTime @default(now())
+  isPaid      Boolean  @default(false)
+  paidDate    DateTime?
+  createdBy   User?    @relation("LoanCreatedBy", fields: [createdById], references: [id])
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Liability {
+  id          String   @id @default(cuid())
+  name        String
+  price       Float
+  description String
+  quantity    Int      @default(1)
+  soldAt      DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isPaid      Boolean  @default(false)
+  paidAt      DateTime?
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+  histories   HistoryLiability[]
+}
+
+model History {
+  id        String       @id @default(cuid())
+  user      User         @relation(fields: [userId], references: [id])
+  userId    String
+  date      DateTime     @default(now())
+  products  HistoryProduct[]
+  liabilities HistoryLiability[]
+  financial Financial[]
+}
+
+model HistoryProduct {
+  id        String   @id @default(cuid())
+  history   History  @relation(fields: [historyId], references: [id])
+  historyId String
+  name      String
+  product   Product  @relation(fields: [productId], references: [id])
+  productId String
+  price     Float
+  description String
+  category  String?
+  quantity  Int      @default(1)
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  username  String
+}
+
+model HistoryLiability {
+  id        String   @id @default(cuid())
+  history   History  @relation(fields: [historyId], references: [id])
+  historyId String
+  name      String
+  liability Liability @relation(fields: [productId], references: [id])
+  productId String
+  price     Float
+  quantity  Int       @default(1)
+  description String
+}
+
+model Financial {
+  id                  String   @id @default(cuid())
+  date                DateTime @default(now())
+  income              Json?    // { zdollar, zcash, edahabCash, Cash, dollar, account }
+  accountsAdjustments Json?    // Array of { label, value }
+  expenses            Json?    // Array of { name, amount }
+  totals              Json?    // { incomeTotal, adjustmentsTotal, combinedTotal, expensesTotal, balance }
+  history             History  @relation(fields: [historyId], references: [id])
+  historyId           String
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  clientName  String
+  clientPhone String
+  amountDue   Float
+  amountPaid  Float
+  expenseType ExpenseType
+  paymentMethod PaymentMethod @default(CASH)
+  description String?
+  dueDate     DateTime?
+  date        DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+  status      ExpenseStatus @default(PENDING)
+  balance     Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Debt {
+  id           String   @id @default(cuid())
+
+  // One-to-one relation to Sale (the main debt sale)
+  sale         Sale?    @relation("DebtToSale", fields: [saleId], references: [id])
+  saleId       String?  @unique
+
+  // One-to-many relation to multiple sales (optional, if needed)
+  relatedSales Sale[]   @relation("DebtRelatedSales")
+}
+
+model Sale {
+  id               String         @id @default(cuid())
+  saleNumber       String         @unique
+  products         SaleProduct[]
+  subtotal         Float
+  discountPercentage Float       @default(0)
+  discountAmount   Float          @default(0)
+  grandTotal       Float
+  amountDue        Float
+  amountPaid       Float
+  remainingBalance Float          @default(0)
+  paymentMethod    PaymentMethod  @default(CASH)
+  changeAmount     Float          @default(0)
+  totalQuantity    Int
+  user             User           @relation(fields: [userId], references: [id])
+  userId           String
+  customerName     String?
+  customerPhone    String?
+  notes            String?
+  status           SaleStatus     @default(PENDING)
+  paymentHistory   PaymentHistory[]
+  dueDate          DateTime?
+  hasDebt          Boolean        @default(false)
+
+  // One-to-one relation to Debt
+  debtRecord       Debt?          @relation("DebtToSale")
+
+  // Optional one-to-many relation to Debt if needed
+  relatedDebtId    String?
+  relatedDebt      Debt?          @relation("DebtRelatedSales", fields: [relatedDebtId], references: [id])
+
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

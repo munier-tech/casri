@@ -1,0 +1,36 @@
+{
+  "name": "casri-inventory",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Inventory Management System for CASRI",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "npx nodemon index.js",
+    "studio": "npx prisma studio --url \"postgresql://neondb_owner:npg_whOlQLVj7bI8@ep-mute-term-ai2nk1e8-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\"",
+    "migrate": "npx prisma migrate dev --url \"postgresql://neondb_owner:npg_whOlQLVj7bI8@ep-mute-term-ai2nk1e8-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\""
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.4.0",
+    "@prisma/client": "^7.4.0",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dayjs": "^1.11.19",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "ioredis": "^5.9.2",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.0.2",
+    "path": "^0.12.7",
+    "pg": "^8.18.0",
+    "redis": "^5.10.0",
+    "yarn": "^1.22.22"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "@types/pg": "^8.16.0",
+    "nodemon": "^3.1.10",
+    "prisma": "^7.4.0"
+  }
+}
