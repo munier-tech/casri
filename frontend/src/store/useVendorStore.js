@@ -1,4 +1,3 @@
-// Complete useVendorStore.js with edit/delete functionality
 import { create } from 'zustand';
 import axiosInstance from '../lib/axios';
 
@@ -13,6 +12,7 @@ const useVendorPurchaseStore = create((set, get) => ({
   purchaseProducts: [],
   productSearchResults: [],
   allProducts: [],
+  isSearchingProducts: false,
 
   // Purchase History
   allPurchases: [],
@@ -33,11 +33,12 @@ const useVendorPurchaseStore = create((set, get) => ({
   isLoadingProducts: false,
   isLoadingPurchases: false,
   error: null,
-  activeTab: 'vendors', // 'vendors', 'purchase', 'records'
+  activeTab: 'vendors',
   showVendorModal: false,
   showPurchaseModal: false,
   showEditVendorModal: false,
   showEditPurchaseModal: false,
+  showPayModal: false,
 
   // ========== TAB METHODS ==========
 
@@ -46,6 +47,7 @@ const useVendorPurchaseStore = create((set, get) => ({
   setShowPurchaseModal: (show) => set({ showPurchaseModal: show }),
   setShowEditVendorModal: (show) => set({ showEditVendorModal: show }),
   setShowEditPurchaseModal: (show) => set({ showEditPurchaseModal: show }),
+  setShowPayModal: (show) => set({ showPayModal: show }),
 
   // ========== EDIT/VIEW METHODS ==========
 
@@ -190,42 +192,36 @@ const useVendorPurchaseStore = create((set, get) => ({
 
   // ========== PRODUCT METHODS ==========
 
-  // Fetch all products for search
-  fetchAllProducts: async () => {
-    set({ isLoadingProducts: true });
-    try {
-      const response = await axiosInstance.get('/products');
-
-      if (response.data.success) {
-        const products = response.data.products || [];
-        set({
-          allProducts: products,
-          isLoadingProducts: false,
-        });
-      } else {
-        set({ isLoadingProducts: false });
-      }
-    } catch (error) {
-      set({ isLoadingProducts: false });
-    }
-  },
-
-  // Search products from fetched list
-  searchProducts: (query) => {
+  // Search products from API
+  searchProducts: async (query) => {
     if (!query.trim()) {
-      set({ productSearchResults: [] });
+      set({ productSearchResults: [], isSearchingProducts: false });
       return;
     }
 
-    const { allProducts } = get();
-    const lowerQuery = query.toLowerCase();
+    set({ isSearchingProducts: true });
 
-    const filtered = allProducts.filter(product =>
-      product.name?.toLowerCase().includes(lowerQuery) ||
-      product.description?.toLowerCase().includes(lowerQuery)
-    ).slice(0, 10);
+    try {
+      const response = await axiosInstance.get(`/products/search?q=${encodeURIComponent(query)}`);
 
-    set({ productSearchResults: filtered });
+      if (response.data.success) {
+        set({ 
+          productSearchResults: response.data.data || [],
+          isSearchingProducts: false 
+        });
+      } else {
+        set({ 
+          productSearchResults: [],
+          isSearchingProducts: false 
+        });
+      }
+    } catch (error) {
+      console.error('Error searching products:', error);
+      set({ 
+        productSearchResults: [],
+        isSearchingProducts: false 
+      });
+    }
   },
 
   clearProductSearchResults: () => {
@@ -240,7 +236,7 @@ const useVendorPurchaseStore = create((set, get) => ({
     set({
       selectedVendor: null,
       purchaseProducts: [],
-      purchaseData: {  // Reset purchase data when vendor is cleared
+      purchaseData: {
         amountDue: 0,
         amountPaid: 0,
         paymentMethod: 'cash',
@@ -266,26 +262,35 @@ const useVendorPurchaseStore = create((set, get) => ({
       }
       return {
         purchaseProducts: [...state.purchaseProducts, {
-          ...product,
+          id: product.id,
+          productId: product.id,
+          name: product.name,
           quantity: 1,
-          price: product.price || product.cost || 0
+          price: parseFloat(product.cost) || 0,
+          unitPrice: parseFloat(product.cost) || 0,
+          cost: parseFloat(product.cost) || 0
         }],
         productSearchResults: [],
       };
     });
 
     // Auto-update amount due when product is added
-    const total = get().calculatePurchaseTotal();
-    get().updatePurchaseData({ amountDue: total });
+    setTimeout(() => {
+      const total = get().calculatePurchaseTotal();
+      get().updatePurchaseData({ amountDue: total });
+    }, 0);
   },
 
   addCustomProductToPurchase: (productName, unitPrice, quantity = 1) => {
     const customProduct = {
       id: `custom_${Date.now()}`,
+      productId: `custom_${Date.now()}`,
       name: productName,
-      price: unitPrice,
-      quantity: quantity,
-      isCustom: true
+      price: parseFloat(unitPrice),
+      unitPrice: parseFloat(unitPrice),
+      quantity: parseInt(quantity),
+      isCustom: true,
+      cost: parseFloat(unitPrice)
     };
 
     set((state) => ({
@@ -294,8 +299,10 @@ const useVendorPurchaseStore = create((set, get) => ({
     }));
 
     // Auto-update amount due when product is added
-    const total = get().calculatePurchaseTotal();
-    get().updatePurchaseData({ amountDue: total });
+    setTimeout(() => {
+      const total = get().calculatePurchaseTotal();
+      get().updatePurchaseData({ amountDue: total });
+    }, 0);
   },
 
   removeProductFromPurchase: (productId) => {
@@ -304,20 +311,38 @@ const useVendorPurchaseStore = create((set, get) => ({
     }));
 
     // Auto-update amount due when product is removed
-    const total = get().calculatePurchaseTotal();
-    get().updatePurchaseData({ amountDue: total });
+    setTimeout(() => {
+      const total = get().calculatePurchaseTotal();
+      get().updatePurchaseData({ amountDue: total });
+    }, 0);
   },
 
   updateProductQuantity: (productId, quantity) => {
     set((state) => ({
       purchaseProducts: state.purchaseProducts.map(p =>
-        p.id === productId ? { ...p, quantity: Math.max(1, quantity) } : p
+        p.id === productId ? { ...p, quantity: Math.max(1, parseInt(quantity) || 1) } : p
       ),
     }));
 
     // Auto-update amount due when quantity changes
-    const total = get().calculatePurchaseTotal();
-    get().updatePurchaseData({ amountDue: total });
+    setTimeout(() => {
+      const total = get().calculatePurchaseTotal();
+      get().updatePurchaseData({ amountDue: total });
+    }, 0);
+  },
+
+  updateProductPrice: (productId, price) => {
+    set((state) => ({
+      purchaseProducts: state.purchaseProducts.map(p =>
+        p.id === productId ? { ...p, price: Math.max(0, parseFloat(price) || 0), unitPrice: Math.max(0, parseFloat(price) || 0) } : p
+      ),
+    }));
+
+    // Auto-update amount due when price changes
+    setTimeout(() => {
+      const total = get().calculatePurchaseTotal();
+      get().updatePurchaseData({ amountDue: total });
+    }, 0);
   },
 
   clearPurchaseProducts: () => {
@@ -404,8 +429,6 @@ const useVendorPurchaseStore = create((set, get) => ({
     }
   },
 
-  // In useVendorStore.js - Add these methods to the store
-
   // Update purchase
   updatePurchase: async (vendorId, purchaseId, purchaseData) => {
     set({ isLoading: true, error: null });
@@ -472,8 +495,10 @@ const useVendorPurchaseStore = create((set, get) => ({
       selectedVendor: null,
       purchaseProducts: purchase.products?.map(product => ({
         id: product.productId || `product_${Date.now()}`,
+        productId: product.productId,
         name: product.productName,
         price: product.unitPrice,
+        unitPrice: product.unitPrice,
         quantity: product.quantity,
         cost: product.unitPrice
       })) || [],
@@ -568,8 +593,9 @@ const useVendorPurchaseStore = create((set, get) => ({
   calculatePurchaseTotal: () => {
     const { purchaseProducts } = get();
     return purchaseProducts.reduce((total, product) => {
-      const price = product.price || product.cost || 0;
-      return total + (price * product.quantity);
+      const price = parseFloat(product.price) || parseFloat(product.cost) || 0;
+      const quantity = parseInt(product.quantity) || 1;
+      return total + (price * quantity);
     }, 0);
   },
 
@@ -585,44 +611,35 @@ const useVendorPurchaseStore = create((set, get) => ({
       return { success: false, error: 'No vendor selected' };
     }
 
-    // Use purchaseData from parameter, not from state
-    if (!purchaseData || purchaseData.amountDue <= 0) {
-      set({ error: 'Amount due must be greater than 0' });
-      return { success: false, error: 'Invalid amount due' };
+    if (currentPurchaseProducts.length === 0) {
+      set({ error: 'Please add at least one product' });
+      return { success: false, error: 'No products added' };
     }
+
+    // Calculate total from products
+    const calculatedTotal = state.calculatePurchaseTotal();
 
     set({ isLoading: true, error: null });
 
     try {
-      // If no products in store, and we have a manual amountDue, we might be creating a simple record
-      // However, the backend requires at least one product name.
-      // If purchaseProducts is empty, we'll create a dummy 'General Purchase' entry if amountDue > 0
-      let purchaseProductsData = currentPurchaseProducts.map(product => ({
+      const purchaseProductsData = currentPurchaseProducts.map(product => ({
         productId: product.isCustom ? null : product.id,
         productName: product.name,
-        quantity: product.quantity,
-        unitPrice: product.price || product.cost || 0,
+        quantity: parseInt(product.quantity) || 1,
+        unitPrice: parseFloat(product.price) || parseFloat(product.cost) || 0,
       }));
 
-      if (purchaseProductsData.length === 0 && purchaseData.amountDue > 0) {
-        purchaseProductsData = [{
-          productName: 'General Purchase',
-          quantity: 1,
-          unitPrice: purchaseData.amountDue
-        }];
-      }
-
-      const purchasePayload = {
+      const payload = {
         products: purchaseProductsData,
-        amountDue: purchaseData.amountDue || 0,
-        amountPaid: purchaseData.amountPaid || 0,
+        amountDue: calculatedTotal,
+        amountPaid: parseFloat(purchaseData.amountPaid) || 0,
         paymentMethod: purchaseData.paymentMethod || 'cash',
         notes: purchaseData.notes || '',
       };
 
       const response = await axiosInstance.post(
         `/vendors/${currentSelectedVendor.id}/purchases`,
-        purchasePayload
+        payload
       );
 
       if (response.data.success) {
@@ -637,12 +654,12 @@ const useVendorPurchaseStore = create((set, get) => ({
             );
           } else {
             updatedVendors = state.vendors.map(vendor =>
-              vendor.id === selectedVendor.id
+              vendor.id === currentSelectedVendor.id
                 ? {
                   ...vendor,
                   totalPurchases: (vendor.totalPurchases || 0) + 1,
-                  totalAmount: (vendor.totalAmount || 0) + (purchaseData.amountDue || 0),
-                  balance: (vendor.balance || 0) + ((purchaseData.amountDue || 0) - (purchaseData.amountPaid || 0)),
+                  totalAmount: (vendor.totalAmount || 0) + calculatedTotal,
+                  balance: (vendor.balance || 0) + (calculatedTotal - (parseFloat(purchaseData.amountPaid) || 0)),
                 }
                 : vendor
             );
@@ -653,7 +670,7 @@ const useVendorPurchaseStore = create((set, get) => ({
             purchaseProducts: [],
             productSearchResults: [],
             selectedVendor: null,
-            purchaseData: {  // Reset purchase data
+            purchaseData: {
               amountDue: 0,
               amountPaid: 0,
               paymentMethod: 'cash',

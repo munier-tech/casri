@@ -2,9 +2,7 @@
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
-
 
 generator client {
   provider = "prisma-client-js"
@@ -96,6 +94,7 @@ model Product {
   purchases         Purchase[]
   saleProducts      SaleProduct[]
   historyProducts   HistoryProduct[]
+  purchaseProducts  PurchaseProduct[] // Add this relation
 }
 
 model Purchase {
@@ -121,6 +120,8 @@ model Purchase {
 
   vendor            Vendor?  @relation(fields: [vendorId], references: [id])
   vendorId          String?
+  
+  purchaseProducts  PurchaseProduct[] // Add this relation
 }
 
 model PurchaseProduct {
@@ -135,8 +136,6 @@ model PurchaseProduct {
   total       Float
 }
 
-
-
 model Vendor {
   id            String     @id @default(cuid())
   name          String
@@ -149,36 +148,6 @@ model Vendor {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 }
-
-// model Sale {
-//   id               String         @id @default(cuid())
-//   saleNumber       String         @unique
-//   products         SaleProduct[]
-//   subtotal         Float
-//   discountPercentage Float       @default(0)
-//   discountAmount   Float          @default(0)
-//   grandTotal       Float
-//   amountDue        Float
-//   amountPaid       Float
-//   remainingBalance Float          @default(0)
-//   paymentMethod    PaymentMethod  @default(CASH)
-//   changeAmount     Float          @default(0)
-//   totalQuantity    Int
-//   user             User           @relation(fields: [userId], references: [id])
-//   userId           String
-//   customerName     String?
-//   customerPhone    String?
-//   notes            String?
-//   status           SaleStatus     @default(PENDING)
-//   paymentHistory   PaymentHistory[]
-//   dueDate          DateTime?
-//   hasDebt          Boolean        @default(false)
-//   debtRecordId     String?        @unique
-//   debtRecord       Debt?          @relation(fields: [debtRecordId], references: [id])
-
-//   createdAt        DateTime       @default(now())
-//   updatedAt        DateTime       @updatedAt
-// }
 
 model SaleProduct {
   id           String  @id @default(cuid())

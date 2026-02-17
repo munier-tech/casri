@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-hot-toast";
+import React from "react"
 import {
   FiSearch,
   FiPlus,
@@ -24,6 +25,106 @@ import {
 import useProductsStore from "../store/useProductsStore";
 import useSalesStore from "../store/UseSalesStore";
 import { DollarSign } from "lucide-react";
+
+// Memoized Product Row Component
+const ProductRow = React.memo(({ 
+  product, 
+  onQuantityChange, 
+  onPriceChange, 
+  onDiscountChange, 
+  onRemove 
+}) => {
+  const total = useMemo(() => product.sellingPrice * product.quantity, [product.sellingPrice, product.quantity]);
+  const discountAmount = useMemo(() => (product.sellingPrice * product.discount) / 100, [product.sellingPrice, product.discount]);
+  const expected = useMemo(() => (product.sellingPrice - discountAmount) * product.quantity, [product.sellingPrice, discountAmount, product.quantity]);
+
+  return (
+    <tr className="hover:bg-gray-50">
+      <td className="px-4 py-3">
+        <div className="flex items-center">
+          <FiPackage className="h-5 w-5 text-gray-400 mr-2" />
+          <div>
+            <p className="font-medium text-gray-900">{product.name}</p>
+          </div>
+        </div>
+      </td>
+
+      <td className="px-4 py-3">
+        <div className="flex items-center space-x-2 max-w-24">
+          <button
+            onClick={() => onQuantityChange(product.id, product.quantity - 1)}
+            className="p-1 rounded hover:bg-gray-200"
+            disabled={product.quantity <= 1}
+          >
+            <FiMinus className="h-3 w-3" />
+          </button>
+          <input
+            type="number"
+            value={product.quantity}
+            onChange={(e) => onQuantityChange(product.id, parseInt(e.target.value) || 1)}
+            className="w-12 p-1 text-center border border-gray-300 rounded text-sm"
+            min="1"
+          />
+          <button
+            onClick={() => onQuantityChange(product.id, product.quantity + 1)}
+            className="p-1 rounded hover:bg-gray-200"
+          >
+            <FiPlus className="h-3 w-3" />
+          </button>
+        </div>
+      </td>
+
+      <td className="px-4 py-3">
+        <input
+          type="number"
+          value={product.sellingPrice}
+          onChange={(e) => onPriceChange(product.id, parseFloat(e.target.value) || 0)}
+          className="w-20 p-1.5 border border-gray-300 rounded text-sm"
+          min="0"
+          step="0.01"
+        />
+      </td>
+
+      <td className="px-4 py-3 font-medium text-gray-900">
+        ${total.toFixed(2)}
+      </td>
+
+      <td className="px-4 py-3">
+        <div className="flex items-center">
+          <input
+            type="number"
+            value={product.discount || 0}
+            onChange={(e) => onDiscountChange(product.id, parseFloat(e.target.value) || 0)}
+            className="w-16 p-1.5 border border-gray-300 rounded text-sm"
+            min="0"
+            max="100"
+            step="0.1"
+          />
+          <span className="ml-1 text-gray-500 text-sm">%</span>
+        </div>
+      </td>
+
+      <td className="px-4 py-3 font-medium text-green-600">
+        ${expected.toFixed(2)}
+      </td>
+
+      <td className="px-4 py-3">
+        <button
+          onClick={() => onRemove(product.id)}
+          className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+        >
+          <FiTrash2 className="h-4 w-4" />
+        </button>
+      </td>
+    </tr>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison to prevent unnecessary re-renders
+  return prevProps.product.id === nextProps.product.id &&
+         prevProps.product.quantity === nextProps.product.quantity &&
+         prevProps.product.sellingPrice === nextProps.product.sellingPrice &&
+         prevProps.product.discount === nextProps.product.discount;
+});
 
 const CreateSaleNew = () => {
   const { fetchProducts } = useProductsStore();
@@ -71,37 +172,56 @@ const CreateSaleNew = () => {
   const amountPaidInputRef = useRef(null);
   const searchResultsRef = useRef(null);
   const paymentDropdownRef = useRef(null);
+  const debounceTimerRef = useRef(null);
 
-  // Calculations
-  const calculations = getSaleCalculations();
+  // Memoized calculations
+  const calculations = useMemo(() => getSaleCalculations(), [selectedProducts, getSaleCalculations]);
 
-  // Calculate grand total with discount
-  const discountAmount = discountType === "percentage"
-    ? (parseFloat(discountValue) || 0) / 100 * calculations.subtotal
-    : parseFloat(discountValue) || 0;
-  const grandTotal = calculations.subtotal - discountAmount;
+  // Memoized discount calculations
+  const { discountAmount, grandTotal } = useMemo(() => {
+    const discount = discountType === "percentage"
+      ? (parseFloat(discountValue) || 0) / 100 * calculations.subtotal
+      : parseFloat(discountValue) || 0;
+    
+    return {
+      discountAmount: discount,
+      grandTotal: calculations.subtotal - discount
+    };
+  }, [calculations.subtotal, discountType, discountValue]);
 
-  // Calculate remaining balance and change
-  const paidAmount = parseFloat(amountPaid) || 0;
-  const dueAmount = parseFloat(amountDue) || grandTotal;
-  const remainingBalance = Math.max(0, dueAmount - paidAmount);
-  const changeAmount = paidAmount > dueAmount ? paidAmount - dueAmount : 0;
+  // Memoized payment calculations
+  const { paidAmount, dueAmount, remainingBalance, changeAmount } = useMemo(() => {
+    const paid = parseFloat(amountPaid) || 0;
+    const due = parseFloat(amountDue) || grandTotal;
+    
+    
+    return {
+      paidAmount: paid,
+      dueAmount: due,
+      remainingBalance: Math.max(0, due - paid),
+      changeAmount: paid > due ? paid - due : 0
+    };
+  }, [amountPaid, amountDue, grandTotal]);
 
-  // Calculate expected money for all products
-  const calculateExpected = (product) => {
-    const discountAmount = (product.sellingPrice * product.discount) / 100;
-    const priceAfterDiscount = product.sellingPrice - discountAmount;
-    return priceAfterDiscount * product.quantity;
-  };
-
-  const totalExpected = selectedProducts.reduce((sum, product) => {
-    return sum + calculateExpected(product);
-  }, 0);
+  // Memoized total expected
+  const totalExpected = useMemo(() => {
+    return selectedProducts.reduce((sum, product) => {
+      const discountAmount = (product.sellingPrice * product.discount) / 100;
+      const priceAfterDiscount = product.sellingPrice - discountAmount;
+      return sum + (priceAfterDiscount * product.quantity);
+    }, 0);
+  }, [selectedProducts]);
 
   // Fetch initial data
   useEffect(() => {
-    fetchProducts();
-    fetchDailySales();
+    const initData = async () => {
+      await Promise.all([
+        fetchProducts(),
+        fetchDailySales()
+      ]);
+    };
+    
+    initData();
 
     if (searchInputRef.current) {
       searchInputRef.current.focus();
@@ -115,14 +235,24 @@ const CreateSaleNew = () => {
     }
   }, [grandTotal, amountDue]);
 
-  // Search products
+  // Search products with debounce
   useEffect(() => {
     if (searchTerm.trim()) {
-      const debounceTimer = setTimeout(() => {
+      // Clear previous timer
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      
+      debounceTimerRef.current = setTimeout(() => {
         searchProducts(searchTerm);
         setShowSearchResults(true);
       }, 300);
-      return () => clearTimeout(debounceTimer);
+      
+      return () => {
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+        }
+      };
     } else {
       setShowSearchResults(false);
     }
@@ -143,8 +273,8 @@ const CreateSaleNew = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Handle product selection
-  const handleProductSelect = (product) => {
+  // Memoized handlers
+  const handleProductSelect = useCallback((product) => {
     if (product.stock <= 0) {
       toast.error(`${product.name} is out of stock`);
       return;
@@ -158,29 +288,42 @@ const CreateSaleNew = () => {
     if (searchInputRef.current) {
       searchInputRef.current.focus();
     }
-  };
+  }, [addProductToSale]);
 
-  // Handle quantity changes
-  const handleQuantityChange = (productId, quantity) => {
+  const handleQuantityChange = useCallback((productId, quantity) => {
     if (quantity >= 1) {
       updateProductQuantity(productId, quantity);
     }
-  };
+  }, [updateProductQuantity]);
 
-  const handlePriceChange = (productId, price) => {
+  const handlePriceChange = useCallback((productId, price) => {
     if (price >= 0) {
       updateProductPrice(productId, parseFloat(price));
     }
-  };
+  }, [updateProductPrice]);
 
-  const handleDiscountChange = (productId, discount) => {
+  const handleDiscountChange = useCallback((productId, discount) => {
     if (discount >= 0 && discount <= 100) {
       updateProductDiscount(productId, parseFloat(discount));
     }
-  };
+  }, [updateProductDiscount]);
 
-  // Complete sale
-  const handleCompleteSale = async () => {
+  const handleRemoveProduct = useCallback((productId) => {
+    removeProductFromSale(productId);
+  }, [removeProductFromSale]);
+
+  const handleCheckoutNow = useCallback(() => {
+    if (selectedProducts.length === 0) {
+      toast.error("Please add at least one product");
+      return;
+    }
+
+    setAmountPaid(grandTotal.toFixed(2));
+    setPaymentMethod("cash");
+    toast.success("Ready for checkout! Please confirm payment.");
+  }, [selectedProducts.length, grandTotal]);
+
+  const handleCompleteSale = useCallback(async () => {
     if (selectedProducts.length === 0) {
       toast.error("Please add at least one product");
       return;
@@ -251,7 +394,7 @@ const CreateSaleNew = () => {
       setSearchTerm("");
 
       // Fetch updated sales
-      fetchDailySales();
+      await fetchDailySales();
 
       // Focus back to search
       if (searchInputRef.current) {
@@ -260,25 +403,26 @@ const CreateSaleNew = () => {
     } catch (error) {
       toast.error(error.response?.data?.error || error.message || "Failed to complete sale");
     }
-  };
+  }, [
+    selectedProducts,
+    paymentMethod,
+    amountDue,
+    amountPaid,
+    grandTotal,
+    saleType,
+    saleDate,
+    customerName,
+    customerPhone,
+    notes,
+    discountType,
+    discountValue,
+    createSale,
+    createSaleByDate,
+    clearSelectedProducts,
+    fetchDailySales
+  ]);
 
-  // Checkout Now function
-  const handleCheckoutNow = () => {
-    if (selectedProducts.length === 0) {
-      toast.error("Please add at least one product");
-      return;
-    }
-
-    // Set amount paid equal to amount due for quick checkout
-    const totalToPay = parseFloat(amountDue) || grandTotal;
-    setAmountPaid(totalToPay.toFixed(2));
-    setPaymentMethod("cash"); // Default to cash for quick checkout
-
-    toast.success("Ready for checkout! Please confirm payment.");
-  };
-
-  // Print receipt
-  const handlePrintReceipt = () => {
+  const handlePrintReceipt = useCallback(() => {
     if (selectedProducts.length === 0) {
       toast.error("No products to print receipt");
       return;
@@ -343,7 +487,7 @@ const CreateSaleNew = () => {
           </div>
           <div class="item-row">
             <div>Amount Paid:</div>
-            <div>$${parseFloat(amountPaid || 0).toFixed(2)}</div>
+            <div>$${paidAmount.toFixed(2)}</div>
           </div>
           <div class="item-row">
             <div>Remaining Balance:</div>
@@ -381,24 +525,25 @@ const CreateSaleNew = () => {
       printWindow.print();
       printWindow.close();
     }, 250);
-  };
+  }, [selectedProducts, saleType, saleDate, calculations.subtotal, discountAmount, amountDue, grandTotal, paidAmount, dueAmount, remainingBalance, changeAmount, paymentMethod, customerName]);
 
   // Payment methods
-  const paymentMethods = [
+  const paymentMethods = useMemo(() => [
     { value: "cash", label: "Cash", icon: <BsCashCoin className="h-4 w-4" /> },
     { value: "zaad", label: "Zaad", icon: <FiSmartphone className="h-4 w-4" /> },
     { value: "edahab", label: "Edahab", icon: <DollarSign className="h-4 w-4" /> }
-  ];
+  ], []);
 
-  // Get selected payment method
-  const selectedPaymentMethod = paymentMethods.find(method => method.value === paymentMethod);
+  const selectedPaymentMethod = useMemo(() => 
+    paymentMethods.find(method => method.value === paymentMethod), 
+    [paymentMethods, paymentMethod]
+  );
 
-  // Get stock status color
-  const getStockStatusColor = (stock, threshold = 5) => {
+  const getStockStatusColor = useCallback((stock, threshold = 5) => {
     if (stock === 0) return "bg-red-100 text-red-800";
     if (stock <= threshold) return "bg-amber-100 text-amber-800";
     return "bg-green-100 text-green-800";
-  };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
@@ -518,92 +663,16 @@ const CreateSaleNew = () => {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {selectedProducts.length > 0 ? (
-                      selectedProducts.map((product) => {
-                        const total = product.sellingPrice * product.quantity;
-                        const discountAmount = (product.sellingPrice * product.discount) / 100;
-                        const expected = (product.sellingPrice - discountAmount) * product.quantity;
-
-                        return (
-                          <tr key={product.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3">
-                              <div className="flex items-center">
-                                <FiPackage className="h-5 w-5 text-gray-400 mr-2" />
-                                <div>
-                                  <p className="font-medium text-gray-900">{product.name}</p>
-                                </div>
-                              </div>
-                            </td>
-
-                            <td className="px-4 py-3">
-                              <div className="flex items-center space-x-2 max-w-24">
-                                <button
-                                  onClick={() => handleQuantityChange(product.id, product.quantity - 1)}
-                                  className="p-1 rounded hover:bg-gray-200"
-                                  disabled={product.quantity <= 1}
-                                >
-                                  <FiMinus className="h-3 w-3" />
-                                </button>
-                                <input
-                                  type="number"
-                                  value={product.quantity}
-                                  onChange={(e) => handleQuantityChange(product.id, parseInt(e.target.value) || 1)}
-                                  className="w-12 p-1 text-center border border-gray-300 rounded text-sm"
-                                  min="1"
-                                />
-                                <button
-                                  onClick={() => handleQuantityChange(product.id, product.quantity + 1)}
-                                  className="p-1 rounded hover:bg-gray-200"
-                                >
-                                  <FiPlus className="h-3 w-3" />
-                                </button>
-                              </div>
-                            </td>
-
-                            <td className="px-4 py-3">
-                              <input
-                                type="number"
-                                value={product.sellingPrice}
-                                onChange={(e) => handlePriceChange(product.id, parseFloat(e.target.value) || 0)}
-                                className="w-20 p-1.5 border border-gray-300 rounded text-sm"
-                                min="0"
-                                step="0.01"
-                              />
-                            </td>
-
-                            <td className="px-4 py-3 font-medium text-gray-900">
-                              ${total.toFixed(2)}
-                            </td>
-
-                            <td className="px-4 py-3">
-                              <div className="flex items-center">
-                                <input
-                                  type="number"
-                                  value={product.discount || 0}
-                                  onChange={(e) => handleDiscountChange(product.id, parseFloat(e.target.value) || 0)}
-                                  className="w-16 p-1.5 border border-gray-300 rounded text-sm"
-                                  min="0"
-                                  max="100"
-                                  step="0.1"
-                                />
-                                <span className="ml-1 text-gray-500 text-sm">%</span>
-                              </div>
-                            </td>
-
-                            <td className="px-4 py-3 font-medium text-green-600">
-                              ${expected.toFixed(2)}
-                            </td>
-
-                            <td className="px-4 py-3">
-                              <button
-                                onClick={() => removeProductFromSale(product.id)}
-                                className="p-1.5 text-red-600 hover:bg-red-50 rounded"
-                              >
-                                <FiTrash2 className="h-4 w-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
+                      selectedProducts.map((product) => (
+                        <ProductRow
+                          key={product.id}
+                          product={product}
+                          onQuantityChange={handleQuantityChange}
+                          onPriceChange={handlePriceChange}
+                          onDiscountChange={handleDiscountChange}
+                          onRemove={handleRemoveProduct}
+                        />
+                      ))
                     ) : (
                       <tr>
                         <td colSpan="7" className="px-4 py-12 text-center text-gray-500">

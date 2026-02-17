@@ -55,6 +55,7 @@ const Dashboard = ({ activeTab: initialActiveTab }) => {
 
   const { user, isLoading, signOut } = useUserStore();
   const { products, fetchProducts } = useProductsStore();
+  const { sales, fetchSales } = useSalesStore();
 
   // Update active tab when location changes
   useEffect(() => {
@@ -68,13 +69,13 @@ const Dashboard = ({ activeTab: initialActiveTab }) => {
     else if (path.includes("/UserDailySales") || path.includes("/UserProductsByDate")) setActiveTab("users");
     else if (path.includes("/loans")) setActiveTab("loans");
     else if (path.includes("/purchases")) setActiveTab("purchases");
-    else if (path.includes("/categories")) setActiveTab("categories");
     else if (path.includes("/payment-methods")) setActiveTab("payment-methods");
   }, [location]);
 
   useEffect(() => {
     fetchProducts();
-  }, [fetchProducts]);
+    fetchSales();
+  }, [fetchProducts, fetchSales]);
 
   const handleLogout = () => {
     signOut();
@@ -155,7 +156,6 @@ const Dashboard = ({ activeTab: initialActiveTab }) => {
       gradient: "bg-gradient-to-r from-green-500 to-green-600",
       path: "/payment-methods",
     },
-
     {
       id: "Sales",
       label: "Sales",
@@ -199,23 +199,7 @@ const Dashboard = ({ activeTab: initialActiveTab }) => {
       color: "bg-gradient-to-r from-amber-500 to-amber-600",
       path: "/stock",
       desc: "View stock levels and alerts",
-    },
-    {
-      id: "financialLog",
-      label: "Financial Log",
-      icon: FileText,
-      color: "bg-gradient-to-r from-indigo-500 to-indigo-600",
-      path: "/FinancialLogForm",
-      desc: "Record financial transactions",
-    },
-    {
-      id: "categories",
-      label: "Categories",
-      icon: Layers,
-      color: "bg-gradient-to-r from-violet-500 to-violet-600",
-      path: "/categories",
-      desc: "Manage product categories",
-    },
+    }
   ];
 
   return (
@@ -461,12 +445,12 @@ const Dashboard = ({ activeTab: initialActiveTab }) => {
                 <div className="flex items-center gap-2">
                   <Target size={20} className="text-blue-600" />
                   <span className="text-sm font-medium text-gray-600">
-                    6 Quick Actions
+                    {quickAccessCards.length} Quick Actions
                   </span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {quickAccessCards.map((card, index) => (
                   <motion.div
                     key={card.id}
@@ -538,96 +522,109 @@ const Dashboard = ({ activeTab: initialActiveTab }) => {
 const DashboardStats = () => {
   const navigate = useNavigate();
   const { products } = useProductsStore();
-  const { sales, fetchSales } = useSalesStore();
+  const { sales, fetchSales, paymentMethodsStats, fetchPaymentMethodsStats } = useSalesStore();
 
   useEffect(() => {
     fetchSales();
-  }, [fetchSales]);
+    fetchPaymentMethodsStats();
+  }, [fetchSales, fetchPaymentMethodsStats]);
+
+  // Calculate real metrics
+  const today = new Date().toDateString();
+  const todaySales = sales?.filter(sale => 
+    new Date(sale.createdAt).toDateString() === today
+  ) || [];
+  
+  const todayRevenue = todaySales.reduce((sum, sale) => sum + (sale.amountPaid || 0), 0);
+  const totalSales = sales?.length || 0;
+  const totalRevenue = sales?.reduce((sum, sale) => sum + (sale.amountPaid || 0), 0) || 0;
+  const accountsReceivable = sales?.reduce((sum, sale) => sum + ((sale.amountDue || 0) - (sale.amountPaid || 0)), 0) || 0;
+  
+  const lowStockItems = products?.filter(p => (p.stock ?? 0) <= (p.lowStockThreshold ?? 5)).length || 0;
+  const outOfStockItems = products?.filter(p => (p.stock ?? 0) === 0).length || 0;
+  
+
+  // Calculate payment method totals
+  const cashTotal = paymentMethodsStats?.today?.cash?.totalAmountPaid || 0;
+  const zaadTotal = paymentMethodsStats?.today?.zaad?.totalAmountPaid || 0;
+  const edahabTotal = paymentMethodsStats?.today?.edahab?.totalAmountPaid || 0;
+  const creditTotal = paymentMethodsStats?.today?.credit?.totalAmountPaid || 0;
 
   const stats = [
     {
       label: "Total Products",
       value: products?.length || 0,
-      change: "+12%",
+      change: `${((products?.length || 0) - (products?.length || 0)).toFixed(0)}%`,
       icon: Package,
       color: "from-emerald-500 to-emerald-600",
       path: "/products",
-      trend: "up",
-    },
-    {
-      label: "Today's Sales",
-      value: sales?.length || 0,
-      change: "+8%",
-      icon: ShoppingCart,
-      color: "from-rose-500 to-rose-600",
-      path: "/DailySales",
-      trend: "up",
-    },
-    {
-      label: "Inventory Items",
-      value: products?.length || 0,
-      change: "-2%",
-      icon: Boxes,
-      color: "from-amber-500 to-amber-600",
-      path: "/stock",
-      trend: "down",
-    },
-    {
-      label: "Payment Methods",
-      value: "4",
-      change: "+0%",
-      icon: Wallet,
-      color: "from-green-500 to-green-600",
-      path: "/payment-methods",
       trend: "stable",
     },
     {
-      label: "Active Users",
-      value: "24",
-      change: "+5%",
-      icon: Users,
-      color: "from-blue-500 to-blue-600",
-      path: "/UserDailySales",
+      label: "Today's Sales",
+      value: todaySales.length,
+      change: `$${todayRevenue.toFixed(2)}`,
+      icon: ShoppingCart,
+      color: "from-rose-500 to-rose-600",
+      path: "/GetSales",
       trend: "up",
     },
+    {
+      label: "Low Stock Items",
+      value: lowStockItems,
+      change: `${outOfStockItems} out of stock`,
+      icon: Boxes,
+      color: "from-amber-500 to-amber-600",
+      path: "/stock",
+      trend: lowStockItems > 5 ? "down" : "stable",
+    },
+    {
+      label: "Total Revenue",
+      value: `$${totalRevenue.toFixed(2)}`,
+      change: `${todaySales.length} sales today`,
+      icon: DollarSign,
+      color: "from-green-500 to-green-600",
+      path: "/GetSales",
+      trend: "up",
+    },
+ 
   ];
 
   const performanceMetrics = [
     {
       title: "Monthly Revenue",
-      value: "$12,458",
-      change: "+24%",
+      value: `$${totalRevenue.toFixed(2)}`,
+      change: `+${((todayRevenue / (totalRevenue || 1)) * 100).toFixed(1)}%`,
       icon: TrendingUp,
       color: "text-emerald-600 bg-emerald-50",
     },
     {
       title: "Low Stock Items",
-      value: products?.filter(p => (p.stock ?? 0) <= (p.lowStockThreshold ?? 5)).length || 0,
-      change: "-8%",
+      value: lowStockItems,
+      change: `${outOfStockItems} out of stock`,
       icon: Boxes,
       color: "text-amber-600 bg-amber-50",
     },
     {
       title: "Accounts Receivable",
-      value: "$8,245",
-      change: "+18%",
+      value: `$${accountsReceivable.toFixed(2)}`,
+      change: `${sales?.filter(s => (s.amountDue - s.amountPaid) > 0).length || 0} pending`,
       icon: DollarSign,
       color: "text-blue-600 bg-blue-50",
     },
     {
       title: "Accounts Payable",
-      value: "$3,420",
-      change: "-5%",
+      value: "$0.00",
+      change: "0 pending",
       icon: FileBarChart,
       color: "text-rose-600 bg-rose-50",
     },
   ];
 
   const recentActivities = [
-    { time: "10:30 AM", action: "New sale recorded", amount: "$450", user: "John D." },
-    { time: "9:45 AM", action: "Product added to inventory", item: "Laptop Pro", user: "Sarah M." },
-    { time: "Yesterday", action: "Monthly report generated", period: "November 2024", user: "System" },
-    { time: "Nov 28", action: "Low stock alert", item: "Wireless Mouse", user: "Auto" },
+    { time: "Today", action: `${todaySales.length} sales recorded`, amount: `$${todayRevenue.toFixed(2)}`, user: "System" },
+    { time: "Today", action: `${lowStockItems} low stock alerts`, amount: `${outOfStockItems} out of stock`, user: "Auto" },
+    { time: "This Week", action: `${totalSales} total sales`, amount: `$${totalRevenue.toFixed(2)}`, user: "System" },
   ];
 
   const quickActions = [
@@ -656,9 +653,110 @@ const DashboardStats = () => {
       path: "/reports",
     },
   ];
-
   return (
     <div className="space-y-8">
+      {/* Payment Methods Cards - TOP OF DASHBOARD */}
+      <div className="mb-8">
+        <h3 className="text-2xl font-bold text-gray-900 mb-6">
+          <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Today's Payments
+          </span>
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Cash Card */}
+          <motion.div
+            className="bg-blue-700 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer"
+            whileHover={{ y: -4 }}
+            onClick={() => navigate("/payment-methods")}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 rounded-xl bg-gradient-to-r from-green-500 to-green-600">
+                  <Wallet size={24} className="text-white" />
+                </div>
+                <div className="text-sm font-bold bg-green-50 text-green-700 px-3 py-1 rounded-full">
+                  Cash
+                </div>
+              </div>
+              <h4 className="text-3xl font-bold text-white mb-2">
+                ${cashTotal.toFixed(2)}
+              </h4>
+              <p className="text-white font-medium">Total Collected</p>
+            </div>
+            <div className="h-2 bg-gradient-to-r from-green-500 to-green-600"></div>
+          </motion.div>
+
+          {/* Zaad Card */}
+          <motion.div
+            className="bg-green-700 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer"
+            whileHover={{ y: -4 }}
+            onClick={() => navigate("/payment-methods")}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600">
+                  <Smartphone size={24} className="text-white" />
+                </div>
+                <div className="text-sm font-bold bg-blue-50 text-blue-700 px-3 py-1 rounded-full">
+                  Zaad
+                </div>
+              </div>
+              <h4 className="text-3xl font-bold text-white mb-2">
+                ${zaadTotal.toFixed(2)}
+              </h4>
+              <p className="text-white font-medium">Total Collected</p>
+            </div>
+            <div className="h-2 bg-gradient-to-r from-blue-500 to-blue-600"></div>
+          </motion.div>
+
+          {/* E-Dahab Card */}
+          <motion.div
+            className="bg-yellow-400 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer"
+            whileHover={{ y: -4 }}
+            onClick={() => navigate("/payment-methods")}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600">
+                  <CreditCard size={24} className="text-white" />
+                </div>
+                <div className="text-sm font-bold bg-purple-50 text-purple-700 px-3 py-1 rounded-full">
+                  E-Dahab
+                </div>
+              </div>
+              <h4 className="text-3xl font-bold text-gray-900 mb-2">
+                ${edahabTotal.toFixed(2)}
+              </h4>
+              <p className="text-gray-600 font-medium">Total Collected</p>
+            </div>
+            <div className="h-2 bg-gradient-to-r from-purple-500 to-purple-600"></div>
+          </motion.div>
+
+          {/* Credit Card */}
+          <motion.div
+            className="bg-white rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer"
+            whileHover={{ y: -4 }}
+            onClick={() => navigate("/payment-methods")}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600">
+                  <DollarSign size={24} className="text-white" />
+                </div>
+                <div className="text-sm font-bold bg-amber-50 text-amber-700 px-3 py-1 rounded-full">
+                  Credit
+                </div>
+              </div>
+              <h4 className="text-3xl font-bold text-gray-900 mb-2">
+                ${creditTotal.toFixed(2)}
+              </h4>
+              <p className="text-gray-600 font-medium">Total Collected</p>
+            </div>
+            <div className="h-2 bg-gradient-to-r from-amber-500 to-amber-600"></div>
+          </motion.div>
+        </div>
+      </div>
+
       {/* Statistics Grid */}
       <div>
         <h3 className="text-2xl font-bold text-gray-900 mb-6">
@@ -682,10 +780,12 @@ const DashboardStats = () => {
                   <div className={`p-3 rounded-xl bg-gradient-to-r ${stat.color}`}>
                     <stat.icon size={24} className="text-white" />
                   </div>
-                  <div className={`text-sm font-bold ${stat.trend === 'up' ? 'text-emerald-600' : stat.trend === 'down' ? 'text-rose-600' : 'text-gray-600'} ${stat.trend === 'up' ? 'bg-emerald-50' : stat.trend === 'down' ? 'bg-rose-50' : 'bg-gray-50'} px-3 py-1 rounded-full`}>
+                  <div className={`text-sm font-bold ${
+                    stat.trend === 'up' ? 'text-emerald-600 bg-emerald-50' : 
+                    stat.trend === 'down' ? 'text-rose-600 bg-rose-50' : 
+                    'text-gray-600 bg-gray-50'
+                  } px-3 py-1 rounded-full`}>
                     {stat.change}
-                    {stat.trend === 'up' && <TrendingUp size={14} className="inline ml-1" />}
-                    {stat.trend === 'down' && <TrendingUp size={14} className="inline ml-1 rotate-180" />}
                   </div>
                 </div>
                 <h4 className="text-3xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
@@ -752,7 +852,7 @@ const DashboardStats = () => {
               <div key={index} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors">
                 <div>
                   <p className="font-medium text-gray-900">{activity.action}</p>
-                  <p className="text-sm text-gray-500">{activity.time} • {activity.user}</p>
+                  <p className="text-sm text-gray-500">{activity.time}</p>
                 </div>
                 {activity.amount && (
                   <span className="font-bold text-emerald-600">{activity.amount}</span>
@@ -798,47 +898,9 @@ const DashboardStats = () => {
           ))}
         </div>
       </div>
-
-      {/* Payment Methods Preview */}
-      <div className="mt-8">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-2xl font-bold text-gray-900">
-            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Payment Methods Overview
-            </span>
-          </h3>
-          <button
-            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-green-600 rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-md hover:shadow-lg"
-            onClick={() => navigate("/payment-methods")}
-          >
-            View Details
-          </button>
-        </div>
-
-        {/* Simple payment method summary */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { method: 'cash', name: 'Cash', icon: Wallet, color: 'bg-gradient-to-r from-green-500 to-green-600' },
-              { method: 'zaad', name: 'Zaad', icon: Smartphone, color: 'bg-gradient-to-r from-blue-500 to-blue-600' },
-              { method: 'edahab', name: 'E-Dahab', icon: CreditCard, color: 'bg-gradient-to-r from-purple-500 to-purple-600' },
-              { method: 'credit', name: 'Credit', icon: DollarSign, color: 'bg-gradient-to-r from-amber-500 to-amber-600' },
-            ].map((item, index) => (
-              <div key={item.method} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer">
-                <div className={`${item.color} p-2 rounded-lg`}>
-                  <item.icon size={20} className="text-white" />
-                </div>
-                <div>
-                  <p className="font-bold text-gray-900">{item.name}</p>
-                  <p className="text-xs text-gray-500">Click for details</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
     </div>
   );
+
 };
 
 // PaymentMethodsStats Component (Integrated into Dashboard.jsx)
@@ -876,7 +938,7 @@ const PaymentMethodsStats = () => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
-    }).format(amount);
+    }).format(amount || 0);
   };
 
   const getMethodIcon = (method) => {
@@ -891,7 +953,7 @@ const PaymentMethodsStats = () => {
 
   const getMethodColor = (method) => {
     switch (method) {
-      case 'cash': return "from-green-500 to-green-600";
+      case 'cash': return "from-blue-900 to-green-600";
       case 'zaad': return "from-blue-500 to-blue-600";
       case 'edahab': return "from-purple-500 to-purple-600";
       case 'credit': return "from-amber-500 to-amber-600";
@@ -1030,7 +1092,7 @@ const PaymentMethodsStats = () => {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h4 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <span className={`p-2 rounded-lg ${getMethodColor(selectedMethod).replace('from-', 'bg-gradient-to-r from-')}`}>
+                <span className={`p-2 rounded-lg bg-gradient-to-r ${getMethodColor(selectedMethod)}`}>
                   {(() => {
                     const Icon = getMethodIcon(selectedMethod);
                     return <Icon className="text-white" size={20} />;
@@ -1060,8 +1122,8 @@ const PaymentMethodsStats = () => {
                 className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="today">Today</option>
-                <option value="week">Last 7 Days</option>
-                <option value="month">This Month</option>
+                <option value="weekly">Last 7 Days</option>
+                <option value="monthly">This Month</option>
               </select>
             </div>
           </div>
