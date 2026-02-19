@@ -5,22 +5,6 @@ import cors from "cors";
 import fs from "fs";
 import path from "path";
 
-import authRouter from "./Routes/authRoute.js";
-import userRouter from "./Routes/userRoute.js";
-import productRouter from "./Routes/productsRouter.js";
-import historyRouter from "./Routes/historyRoute.js";
-import liabilityRouter from "./Routes/LiabilityRoute.js";
-import financialRouter from "./Routes/financialRoute.js";
-import categoryRouter from "./Routes/categoryRoute.js";
-import SalesRouter from "./Routes/salesRoute.js";
-import uploadRouter from "./Routes/uploadRoute.js";
-import loanRouter from "./Routes/loanRoute.js";
-import accountsReceivableRoutes from "./Routes/accountReceivableRouter.js";
-import purchaseRouter from "./Routes/purchaseRoute.js";
-import VendorRouter from "./Routes/vendorRoute.js";
-import reportRouter from "./Routes/ReportsRoute.js";
-import expenseRoutes from "./Routes/expenseRoute.js";
-
 dotenv.config();
 
 const app = express();
@@ -30,10 +14,9 @@ const PORT = process.env.PORT || 5000;
 // CORS CONFIG
 // ==========================
 const corsOptions = {
-  origin:
-    process.env.NODE_ENV === "production"
-      ? process.env.CORS_ORIGIN
-      : "http://localhost:5173",
+  origin: process.env.NODE_ENV === "production"
+    ? process.env.CORS_ORIGIN || "https://your-frontend.vercel.app"
+    : "http://localhost:5173",
   credentials: true,
 };
 
@@ -51,16 +34,44 @@ app.use((req, _res, next) => {
 });
 
 // ==========================
-// UPLOADS (LOCAL ONLY)
+// DYNAMIC ROUTE IMPORTS
 // ==========================
-const uploadsDir = path.join(process.cwd(), "uploads");
+async function loadRoutes() {
+  const authRouter = (await import("./Routes/authRoute.js")).default;
+  const userRouter = (await import("./Routes/userRoute.js")).default;
+  const productRouter = (await import("./Routes/productsRouter.js")).default;
+  const historyRouter = (await import("./Routes/historyRoute.js")).default;
+  const liabilityRouter = (await import("./Routes/LiabilityRoute.js")).default;
+  const financialRouter = (await import("./Routes/financialRoute.js")).default;
+  const categoryRouter = (await import("./Routes/categoryRoute.js")).default;
+  const SalesRouter = (await import("./Routes/salesRoute.js")).default;
+  const uploadRouter = (await import("./Routes/uploadRoute.js")).default;
+  const loanRouter = (await import("./Routes/loanRoute.js")).default;
+  const accountsReceivableRoutes = (await import("./Routes/accountReceivableRouter.js")).default;
+  const purchaseRouter = (await import("./Routes/purchaseRoute.js")).default;
+  const VendorRouter = (await import("./Routes/vendorRoute.js")).default;
+  const reportRouter = (await import("./Routes/ReportsRoute.js")).default;
+  const expenseRoutes = (await import("./Routes/expenseRoute.js")).default;
 
-if (process.env.VERCEL !== "1") {
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-  app.use("/uploads", express.static(uploadsDir));
+  app.use("/api/auth", authRouter);
+  app.use("/api/user", userRouter);
+  app.use("/api/products", productRouter);
+  app.use("/api/categories", categoryRouter);
+  app.use("/api/upload", uploadRouter);
+  app.use("/api/history", historyRouter);
+  app.use("/api/liability", liabilityRouter);
+  app.use("/api/financial", financialRouter);
+  app.use("/api/sales", SalesRouter);
+  app.use("/api/loans", loanRouter);
+  app.use("/api/purchases", purchaseRouter);
+  app.use("/api/reports", reportRouter);
+  app.use("/api/vendors", VendorRouter);
+  app.use("/api/expenses", expenseRoutes);
+  app.use("/api/receivables", accountsReceivableRoutes);
 }
+
+// Load routes
+await loadRoutes();
 
 // ==========================
 // DIAGNOSTIC ROUTE
@@ -70,32 +81,20 @@ app.get("/api", (_req, res) => {
     message: "CASRI Inventory Management System API is running!",
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
-    cors: {
-      allowedOrigins: corsOptions.origin,
-      credentials: corsOptions.credentials,
-    },
-    database: "Connected via Prisma",
+    vercel: process.env.VERCEL === "1" ? "yes" : "no",
   });
 });
 
 // ==========================
-// ROUTES
+// ERROR HANDLING
 // ==========================
-app.use("/api/auth", authRouter);
-app.use("/api/user", userRouter);
-app.use("/api/products", productRouter);
-app.use("/api/categories", categoryRouter);
-app.use("/api/upload", uploadRouter);
-app.use("/api/history", historyRouter);
-app.use("/api/liability", liabilityRouter);
-app.use("/api/financial", financialRouter);
-app.use("/api/sales", SalesRouter);
-app.use("/api/loans", loanRouter);
-app.use("/api/purchases", purchaseRouter);
-app.use("/api/reports", reportRouter);
-app.use("/api/vendors", VendorRouter);
-app.use("/api/expenses", expenseRoutes);
-app.use("/api/receivables", accountsReceivableRoutes);
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({ 
+    error: 'Internal server error',
+    message: err.message 
+  });
+});
 
 // ==========================
 // START SERVER (LOCAL ONLY)
@@ -104,13 +103,7 @@ if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV}`);
-    console.log(
-      `CORS Origin: ${
-        process.env.NODE_ENV === "production"
-          ? process.env.CORS_ORIGIN
-          : "http://localhost:5173"
-      }`
-    );
+    console.log(`Vercel: ${process.env.VERCEL === "1" ? "yes" : "no"}`);
   });
 }
 
