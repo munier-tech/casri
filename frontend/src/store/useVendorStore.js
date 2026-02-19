@@ -19,6 +19,7 @@ const useVendorPurchaseStore = create((set, get) => ({
   vendorPurchases: [],
   purchaseRecords: [],
   editingPurchase: null,
+  selectedPurchase: null, // Added for view modal
 
   // Purchase Form Data
   purchaseData: {
@@ -39,6 +40,7 @@ const useVendorPurchaseStore = create((set, get) => ({
   showEditVendorModal: false,
   showEditPurchaseModal: false,
   showPayModal: false,
+  showViewPurchaseModal: false, // Added for view modal
 
   // ========== TAB METHODS ==========
 
@@ -48,14 +50,17 @@ const useVendorPurchaseStore = create((set, get) => ({
   setShowEditVendorModal: (show) => set({ showEditVendorModal: show }),
   setShowEditPurchaseModal: (show) => set({ showEditPurchaseModal: show }),
   setShowPayModal: (show) => set({ showPayModal: show }),
+  setShowViewPurchaseModal: (show) => set({ showViewPurchaseModal: show }), // Added
 
   // ========== EDIT/VIEW METHODS ==========
 
   setEditingVendor: (vendor) => set({ editingVendor: vendor }),
   setEditingPurchase: (purchase) => set({ editingPurchase: purchase }),
+  setSelectedPurchase: (purchase) => set({ selectedPurchase: purchase }), // Added
 
   clearEditingVendor: () => set({ editingVendor: null }),
   clearEditingPurchase: () => set({ editingPurchase: null }),
+  clearSelectedPurchase: () => set({ selectedPurchase: null }), // Added
 
   // ========== PURCHASE DATA METHODS ==========
 
