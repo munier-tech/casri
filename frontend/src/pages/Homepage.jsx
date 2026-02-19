@@ -17,11 +17,18 @@ import {
   FiSmartphone,
   FiUser,
   FiPhone,
-  FiChevronDown
+  FiChevronDown,
+  FiCreditCard,
+  FiCheckCircle,
+  FiClock,
+  FiAlertCircle
 } from "react-icons/fi";
 import {
-  BsCashCoin
+  BsCashCoin,
+  BsPhone,
+  BsWallet2
 } from "react-icons/bs";
+import { MdPayment, MdReceipt } from "react-icons/md";
 import useProductsStore from "../store/useProductsStore";
 import useSalesStore from "../store/UseSalesStore";
 import { DollarSign } from "lucide-react";
@@ -39,50 +46,63 @@ const ProductRow = React.memo(({
   const expected = useMemo(() => (product.sellingPrice - discountAmount) * product.quantity, [product.sellingPrice, discountAmount, product.quantity]);
 
   return (
-    <tr className="hover:bg-gray-50">
+    <motion.tr 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/50 transition-all duration-200"
+    >
       <td className="px-4 py-3">
         <div className="flex items-center">
-          <FiPackage className="h-5 w-5 text-gray-400 mr-2" />
+          <div className="h-8 w-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center mr-3">
+            <FiPackage className="h-4 w-4 text-white" />
+          </div>
           <div>
             <p className="font-medium text-gray-900">{product.name}</p>
+            <p className="text-xs text-gray-500">ID: {product.id.slice(0, 8)}</p>
           </div>
         </div>
       </td>
 
       <td className="px-4 py-3">
         <div className="flex items-center space-x-2 max-w-24">
-          <button
+          <motion.button
+            whileTap={{ scale: 0.95 }}
             onClick={() => onQuantityChange(product.id, product.quantity - 1)}
-            className="p-1 rounded hover:bg-gray-200"
+            className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-600 transition-colors"
             disabled={product.quantity <= 1}
           >
             <FiMinus className="h-3 w-3" />
-          </button>
+          </motion.button>
           <input
             type="number"
             value={product.quantity}
             onChange={(e) => onQuantityChange(product.id, parseInt(e.target.value) || 1)}
-            className="w-12 p-1 text-center border border-gray-300 rounded text-sm"
+            className="w-14 p-1.5 text-center border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             min="1"
           />
-          <button
+          <motion.button
+            whileTap={{ scale: 0.95 }}
             onClick={() => onQuantityChange(product.id, product.quantity + 1)}
-            className="p-1 rounded hover:bg-gray-200"
+            className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-600 transition-colors"
           >
             <FiPlus className="h-3 w-3" />
-          </button>
+          </motion.button>
         </div>
       </td>
 
       <td className="px-4 py-3">
-        <input
-          type="number"
-          value={product.sellingPrice}
-          onChange={(e) => onPriceChange(product.id, parseFloat(e.target.value) || 0)}
-          className="w-20 p-1.5 border border-gray-300 rounded text-sm"
-          min="0"
-          step="0.01"
-        />
+        <div className="relative">
+          <FiDollarSign className="absolute left-3 top-2.5 h-3.5 w-3.5 text-gray-400" />
+          <input
+            type="number"
+            value={product.sellingPrice}
+            onChange={(e) => onPriceChange(product.id, parseFloat(e.target.value) || 0)}
+            className="w-24 pl-8 p-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            min="0"
+            step="0.01"
+          />
+        </div>
       </td>
 
       <td className="px-4 py-3 font-medium text-gray-900">
@@ -95,7 +115,7 @@ const ProductRow = React.memo(({
             type="number"
             value={product.discount || 0}
             onChange={(e) => onDiscountChange(product.id, parseFloat(e.target.value) || 0)}
-            className="w-16 p-1.5 border border-gray-300 rounded text-sm"
+            className="w-16 p-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             min="0"
             max="100"
             step="0.1"
@@ -109,17 +129,17 @@ const ProductRow = React.memo(({
       </td>
 
       <td className="px-4 py-3">
-        <button
+        <motion.button
+          whileTap={{ scale: 0.95 }}
           onClick={() => onRemove(product.id)}
-          className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+          className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
         >
           <FiTrash2 className="h-4 w-4" />
-        </button>
+        </motion.button>
       </td>
-    </tr>
+    </motion.tr>
   );
 }, (prevProps, nextProps) => {
-  // Custom comparison to prevent unnecessary re-renders
   return prevProps.product.id === nextProps.product.id &&
          prevProps.product.quantity === nextProps.product.quantity &&
          prevProps.product.sellingPrice === nextProps.product.sellingPrice &&
@@ -166,6 +186,7 @@ const CreateSaleNew = () => {
   const [discountValue, setDiscountValue] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [showPaymentDropdown, setShowPaymentDropdown] = useState(false);
+  const [activeTab, setActiveTab] = useState("cart");
 
   // Refs
   const searchInputRef = useRef(null);
@@ -193,7 +214,6 @@ const CreateSaleNew = () => {
   const { paidAmount, dueAmount, remainingBalance, changeAmount } = useMemo(() => {
     const paid = parseFloat(amountPaid) || 0;
     const due = parseFloat(amountDue) || grandTotal;
-    
     
     return {
       paidAmount: paid,
@@ -238,7 +258,6 @@ const CreateSaleNew = () => {
   // Search products with debounce
   useEffect(() => {
     if (searchTerm.trim()) {
-      // Clear previous timer
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
@@ -312,18 +331,7 @@ const CreateSaleNew = () => {
     removeProductFromSale(productId);
   }, [removeProductFromSale]);
 
-  const handleCheckoutNow = useCallback(() => {
-    if (selectedProducts.length === 0) {
-      toast.error("Please add at least one product");
-      return;
-    }
-
-    setAmountPaid(grandTotal.toFixed(2));
-    setPaymentMethod("cash");
-    toast.success("Ready for checkout! Please confirm payment.");
-  }, [selectedProducts.length, grandTotal]);
-
-  const handleCompleteSale = useCallback(async () => {
+  const handleCheckout = useCallback(async () => {
     if (selectedProducts.length === 0) {
       toast.error("Please add at least one product");
       return;
@@ -434,83 +442,77 @@ const CreateSaleNew = () => {
       <head>
         <title>Sale Receipt</title>
         <style>
-          body { font-family: 'Courier New', monospace; margin: 20px; }
-          .receipt { width: 280px; margin: 0 auto; }
-          .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
-          .header h2 { margin: 0; font-size: 18px; }
-          .header p { margin: 3px 0; font-size: 12px; }
-          .item-row { display: flex; justify-content: space-between; margin: 4px 0; font-size: 12px; }
-          .item-row .name { flex: 2; }
-          .item-row .qty { text-align: center; flex: 0.5; }
-          .item-row .price { text-align: right; flex: 1; }
-          .divider { border-top: 1px dashed #000; margin: 10px 0; }
-          .total-row { font-weight: bold; font-size: 14px; margin-top: 5px; }
-          .footer { text-align: center; margin-top: 20px; font-size: 10px; }
-          .bold { font-weight: bold; }
-          .status { padding: 2px 8px; border-radius: 4px; font-size: 10px; }
+          body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 20px; background: #f3f4f6; }
+          .receipt { max-width: 320px; margin: 0 auto; background: white; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); overflow: hidden; }
+          .header { background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; padding: 24px; text-align: center; }
+          .header h2 { margin: 0; font-size: 24px; font-weight: 600; }
+          .header p { margin: 4px 0 0; opacity: 0.9; font-size: 14px; }
+          .content { padding: 24px; }
+          .divider { border-top: 2px dashed #e5e7eb; margin: 16px 0; }
+          .row { display: flex; justify-content: space-between; margin: 8px 0; font-size: 14px; }
+          .total-row { font-weight: 700; font-size: 18px; color: #1f2937; }
+          .status-badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
           .paid { background: #d1fae5; color: #065f46; }
           .partial { background: #fef3c7; color: #92400e; }
+          .footer { text-align: center; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; }
         </style>
       </head>
       <body>
         <div class="receipt">
           <div class="header">
-            <h2>INVENTORY SYSTEM</h2>
+            <h2>INVENTORY PRO</h2>
             <p>${saleType === "date" ? new Date(saleDate).toLocaleDateString() : new Date().toLocaleDateString()}</p>
             <p>${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
           </div>
-          <div class="item-row bold">
-            <div class="name">PRODUCT</div>
-            <div class="qty">QTY</div>
-            <div class="price">AMOUNT</div>
-          </div>
-          <div class="divider"></div>
-          ${selectedProducts.map(item => `
-            <div class="item-row">
-              <div class="name">${item.name}</div>
-              <div class="qty">${item.quantity}</div>
-              <div class="price">$${(item.sellingPrice * item.quantity).toFixed(2)}</div>
+          <div class="content">
+            ${selectedProducts.map(item => `
+              <div class="row">
+                <span>${item.name} x${item.quantity}</span>
+                <span>$${(item.sellingPrice * item.quantity).toFixed(2)}</span>
+              </div>
+            `).join('')}
+            <div class="divider"></div>
+            <div class="row">
+              <span>Subtotal</span>
+              <span>$${calculations.subtotal.toFixed(2)}</span>
             </div>
-          `).join('')}
-          <div class="divider"></div>
-          <div class="item-row">
-            <div>Subtotal:</div>
-            <div>$${calculations.subtotal.toFixed(2)}</div>
-          </div>
-          <div class="item-row">
-            <div>Discount:</div>
-            <div>-$${discountAmount.toFixed(2)}</div>
-          </div>
-          <div class="item-row total-row">
-            <div>AMOUNT DUE:</div>
-            <div>$${parseFloat(amountDue || grandTotal).toFixed(2)}</div>
-          </div>
-          <div class="item-row">
-            <div>Amount Paid:</div>
-            <div>$${paidAmount.toFixed(2)}</div>
-          </div>
-          <div class="item-row">
-            <div>Remaining Balance:</div>
-            <div>$${remainingBalance.toFixed(2)}</div>
-          </div>
-          <div class="item-row">
-            <div>Change:</div>
-            <div>$${changeAmount.toFixed(2)}</div>
-          </div>
-          <div class="item-row">
-            <div>Payment Method:</div>
-            <div>${paymentMethod ? paymentMethod.toUpperCase() : 'CASH'}</div>
-          </div>
-          ${customerName ? `<div class="item-row"><div>Customer:</div><div>${customerName}</div></div>` : ''}
-          <div class="item-row">
-            <div>Status:</div>
-            <div class="status ${paidAmount >= dueAmount ? 'paid' : 'partial'}">
-              ${paidAmount >= dueAmount ? 'FULLY PAID' : 'PARTIALLY PAID'}
+            <div class="row">
+              <span>Discount</span>
+              <span>-$${discountAmount.toFixed(2)}</span>
             </div>
-          </div>
-          <div class="footer">
-            <p>Thank you for your business!</p>
-            <p>Receipt #: ${Date.now().toString().slice(-6)}</p>
+            <div class="row total-row">
+              <span>TOTAL</span>
+              <span>$${parseFloat(amountDue || grandTotal).toFixed(2)}</span>
+            </div>
+            <div class="row">
+              <span>Paid</span>
+              <span>$${paidAmount.toFixed(2)}</span>
+            </div>
+            ${remainingBalance > 0 ? `
+              <div class="row" style="color: #d97706;">
+                <span>Balance Due</span>
+                <span>$${remainingBalance.toFixed(2)}</span>
+              </div>
+            ` : ''}
+            ${changeAmount > 0 ? `
+              <div class="row" style="color: #059669;">
+                <span>Change</span>
+                <span>$${changeAmount.toFixed(2)}</span>
+              </div>
+            ` : ''}
+            <div class="row">
+              <span>Payment</span>
+              <span style="text-transform: uppercase;">${paymentMethod || 'CASH'}</span>
+            </div>
+            <div style="text-align: center; margin-top: 16px;">
+              <span class="status-badge ${paidAmount >= dueAmount ? 'paid' : 'partial'}">
+                ${paidAmount >= dueAmount ? '✓ FULLY PAID' : '⏱ PARTIALLY PAID'}
+              </span>
+            </div>
+            <div class="footer">
+              <p>Thank you for your business!</p>
+              <p>Receipt #: ${Date.now().toString().slice(-8)}</p>
+            </div>
           </div>
         </div>
       </body>
@@ -525,13 +527,13 @@ const CreateSaleNew = () => {
       printWindow.print();
       printWindow.close();
     }, 250);
-  }, [selectedProducts, saleType, saleDate, calculations.subtotal, discountAmount, amountDue, grandTotal, paidAmount, dueAmount, remainingBalance, changeAmount, paymentMethod, customerName]);
+  }, [selectedProducts, saleType, saleDate, calculations.subtotal, discountAmount, amountDue, grandTotal, paidAmount, dueAmount, remainingBalance, changeAmount, paymentMethod]);
 
   // Payment methods
   const paymentMethods = useMemo(() => [
-    { value: "cash", label: "Cash", icon: <BsCashCoin className="h-4 w-4" /> },
-    { value: "zaad", label: "Zaad", icon: <FiSmartphone className="h-4 w-4" /> },
-    { value: "edahab", label: "Edahab", icon: <DollarSign className="h-4 w-4" /> }
+    { value: "cash", label: "Cash", icon: <BsCashCoin className="h-4 w-4" />, color: "from-green-500 to-emerald-600" },
+    { value: "zaad", label: "Zaad", icon: <FiSmartphone className="h-4 w-4" />, color: "from-blue-500 to-indigo-600" },
+    { value: "edahab", label: "Edahab", icon: <DollarSign className="h-4 w-4" />, color: "from-purple-500 to-pink-600" }
   ], []);
 
   const selectedPaymentMethod = useMemo(() => 
@@ -540,32 +542,60 @@ const CreateSaleNew = () => {
   );
 
   const getStockStatusColor = useCallback((stock, threshold = 5) => {
-    if (stock === 0) return "bg-red-100 text-red-800";
-    if (stock <= threshold) return "bg-amber-100 text-amber-800";
-    return "bg-green-100 text-green-800";
+    if (stock === 0) return "bg-red-100 text-red-800 border-red-200";
+    if (stock <= threshold) return "bg-amber-100 text-amber-800 border-amber-200";
+    return "bg-green-100 text-green-800 border-green-200";
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
 
-        {/* Header */}
-        <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        {/* Header with Glassmorphism */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-gray-200/50"
+        >
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Create New Sale</h1>
-            <p className="text-gray-600 text-sm mt-1">Search products and complete the transaction</p>
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              Create New Sale
+            </h1>
+            <p className="text-gray-600 text-sm mt-1 flex items-center">
+              <FiShoppingCart className="mr-2 h-4 w-4" />
+              Search products and complete the transaction
+            </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
+          <div className="flex items-center gap-3">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={handlePrintReceipt}
               disabled={selectedProducts.length === 0}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-sm"
+              className="px-5 py-2.5 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-xl hover:from-gray-200 hover:to-gray-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-sm font-medium shadow-sm transition-all duration-200"
             >
-              <FiPrinter className="mr-2" />
-              Print
-            </button>
+              <FiPrinter className="mr-2 h-4 w-4" />
+              Print Receipt
+            </motion.button>
           </div>
+        </motion.div>
+
+        {/* Tabs for better organization */}
+        <div className="flex gap-2 mb-6">
+          {['cart', 'customer', 'payment'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium capitalize transition-all ${
+                activeTab === tab 
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg' 
+                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
 
         {/* Main Content */}
@@ -574,222 +604,280 @@ const CreateSaleNew = () => {
           {/* Left Column - Cart Section */}
           <div className="lg:col-span-2 space-y-6">
 
-            {/* Cart Header */}
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
+            {/* Cart Header with Stats */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-2xl border border-gray-200/60 p-5 shadow-sm hover:shadow-md transition-shadow"
+            >
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-800">Cart</h2>
-                <div className="flex items-center text-sm text-gray-500">
-                  <FiPercent className="h-4 w-4 mr-1" />
-                  <span className="line-through">Max Discount: 100%</span>
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                    <FiShoppingCart className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-800">Shopping Cart</h2>
+                    <p className="text-sm text-gray-500">{selectedProducts.length} items selected</p>
+                  </div>
+                </div>
+                <div className="flex items-center text-sm bg-gradient-to-r from-amber-50 to-orange-50 px-3 py-1.5 rounded-xl border border-amber-200">
+                  <FiPercent className="h-4 w-4 text-amber-600 mr-1" />
+                  <span className="text-amber-700 font-medium">Max Discount: 100%</span>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
-            {/* Product Search */}
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
+            {/* Product Search with Enhanced UI */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="bg-white rounded-2xl border border-gray-200/60 p-5 shadow-sm hover:shadow-md transition-shadow"
+            >
               <div className="relative" ref={searchResultsRef}>
                 <div className="relative">
-                  <FiSearch className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                  <FiSearch className="absolute left-4 top-3.5 h-5 w-5 text-gray-400" />
                   <input
                     ref={searchInputRef}
                     type="text"
                     placeholder="Search products or scan barcodes..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full pl-12 pr-12 py-3.5 border-2 border-gray-200 rounded-xl bg-white placeholder-gray-400 text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all"
                   />
                   {searchTerm && (
                     <button
                       onClick={() => setSearchTerm("")}
-                      className="absolute right-3 top-3"
+                      className="absolute right-4 top-3.5"
                     >
-                      <FiX className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                      <FiX className="h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors" />
                     </button>
                   )}
                 </div>
 
-                {/* Search Results */}
+                {/* Search Results with Enhanced Animation */}
                 <AnimatePresence>
                   {showSearchResults && searchResults.length > 0 && (
                     <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto"
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                      className="absolute z-10 mt-2 w-full bg-white border-2 border-gray-100 rounded-xl shadow-xl max-h-96 overflow-y-auto"
                     >
-                      {searchResults.map((product) => (
-                        <div
+                      {searchResults.map((product, index) => (
+                        <motion.div
                           key={product.id}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
                           onClick={() => handleProductSelect(product)}
-                          className="p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                          className="p-4 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-all"
                         >
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <FiPackage className="h-4 w-4 text-gray-400 mr-2" />
+                            <div className="flex items-center flex-1">
+                              <div className="h-10 w-10 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center mr-3">
+                                <FiPackage className="h-5 w-5 text-gray-600" />
+                              </div>
                               <div>
-                                <p className="font-medium text-gray-800">{product.name}</p>
-                                <p className="text-sm text-gray-500">Price: ${product.price || product.cost}</p>
+                                <p className="font-semibold text-gray-900">{product.name}</p>
+                                <div className="flex items-center gap-3 mt-1">
+                                  <p className="text-sm text-gray-600">Price: <span className="font-medium text-green-600">${product.price || product.cost}</span></p>
+                                  <span className={`text-xs px-2 py-1 rounded-full border ${getStockStatusColor(product.stock, product.lowStockThreshold)}`}>
+                                    Stock: {product.stock}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <span className={`text-xs px-2 py-1 rounded-full ${getStockStatusColor(product.stock, product.lowStockThreshold)}`}>
-                                Stock: {product.stock}
-                              </span>
-                              <FiPlus className="h-4 w-4 text-blue-500" />
+                            <div className="h-8 w-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center text-white">
+                              <FiPlus className="h-4 w-4" />
                             </div>
                           </div>
-                        </div>
+                        </motion.div>
                       ))}
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
-            </div>
+            </motion.div>
 
-            {/* Products Table */}
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            {/* Products Table with Modern Design */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-white rounded-2xl border border-gray-200/60 overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+            >
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"># Qty</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">$ Price</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">$ Discount</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expected</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                  <thead>
+                    <tr className="bg-gradient-to-r from-gray-50 to-gray-100/50 border-b-2 border-gray-200">
+                      {['Product', 'Qty', 'Price', 'Total', 'Discount %', 'Expected', 'Action'].map((header) => (
+                        <th key={header} className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          {header}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {selectedProducts.length > 0 ? (
-                      selectedProducts.map((product) => (
-                        <ProductRow
-                          key={product.id}
-                          product={product}
-                          onQuantityChange={handleQuantityChange}
-                          onPriceChange={handlePriceChange}
-                          onDiscountChange={handleDiscountChange}
-                          onRemove={handleRemoveProduct}
-                        />
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="7" className="px-4 py-12 text-center text-gray-500">
-                          <FiShoppingCart className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-                          <p className="text-sm">Your cart is empty</p>
-                          <p className="text-xs text-gray-400 mt-1">Search and add products to get started!</p>
-                        </td>
-                      </tr>
-                    )}
+                  <tbody className="divide-y divide-gray-100">
+                    <AnimatePresence>
+                      {selectedProducts.length > 0 ? (
+                        selectedProducts.map((product) => (
+                          <ProductRow
+                            key={product.id}
+                            product={product}
+                            onQuantityChange={handleQuantityChange}
+                            onPriceChange={handlePriceChange}
+                            onDiscountChange={handleDiscountChange}
+                            onRemove={handleRemoveProduct}
+                          />
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="7" className="px-4 py-16 text-center">
+                            <motion.div
+                              initial={{ scale: 0.9 }}
+                              animate={{ scale: 1 }}
+                              className="flex flex-col items-center"
+                            >
+                              <div className="h-20 w-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mb-4">
+                                <FiShoppingCart className="h-10 w-10 text-gray-400" />
+                              </div>
+                              <p className="text-gray-600 font-medium">Your cart is empty</p>
+                              <p className="text-sm text-gray-400 mt-1">Search and add products to get started!</p>
+                            </motion.div>
+                          </td>
+                        </tr>
+                      )}
+                    </AnimatePresence>
                   </tbody>
                 </table>
               </div>
-            </div>
+            </motion.div>
           </div>
 
-          {/* Right Column - Customer Information */}
+          {/* Right Column - Checkout Section */}
           <div className="space-y-6">
 
-            {/* Customer Information Card */}
-            <div className="bg-white rounded-lg border border-gray-200 p-5">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Customer Information</h2>
-
-              <div className="space-y-5">
-                {/* Total */}
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-gray-600">Total:</span>
-                    <span className="text-xl font-bold text-gray-900">${calculations.subtotal.toFixed(2)}</span>
-                  </div>
+            {/* Customer Information Card with Modern Design */}
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="bg-white rounded-2xl border border-gray-200/60 p-6 shadow-sm hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-10 w-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+                  <FiUser className="h-5 w-5 text-white" />
                 </div>
+                <h2 className="text-lg font-semibold text-gray-800">Customer Information</h2>
+              </div>
 
-                {/* Discount */}
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-gray-600">Discount: (Max: 100%)</span>
-                    <span className="text-red-600 font-medium">-${discountAmount.toFixed(2)}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="relative flex-1">
-                      {discountType === "percentage" ? (
-                        <FiPercent className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                      ) : (
-                        <FiDollarSign className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                      )}
-                      <input
-                        type="number"
-                        value={discountValue}
-                        onChange={(e) => setDiscountValue(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded text-sm"
-                        placeholder={discountType === "percentage" ? "0" : "0.00"}
-                        min="0"
-                        max={discountType === "percentage" ? "100" : calculations.subtotal}
-                        step={discountType === "percentage" ? "1" : "0.01"}
-                      />
-                    </div>
-                    <button
-                      onClick={() => setDiscountType(discountType === "percentage" ? "amount" : "percentage")}
-                      className="ml-2 px-3 py-2 border border-gray-300 rounded text-sm bg-gray-50 hover:bg-gray-100"
-                    >
-                      {discountType === "percentage" ? "%" : "$"}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Expected */}
-                <div className="pt-2 border-t border-gray-100">
+              <div className="space-y-6">
+                {/* Total and Discount Section */}
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-xl p-4 space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Expected:</span>
-                    <span className="text-xl font-bold text-green-600">${(calculations.subtotal - discountAmount).toFixed(2)}</span>
+                    <span className="text-gray-600">Subtotal:</span>
+                    <span className="text-2xl font-bold text-gray-900">${calculations.subtotal.toFixed(2)}</span>
                   </div>
-                </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Discount:</span>
+                    <span className="text-xl font-semibold text-red-500">-${discountAmount.toFixed(2)}</span>
+                  </div>
 
-                {/* Payment Method Section */}
-                <div className="pt-4 border-t border-gray-200">
-                  <div className="space-y-4">
-                    {/* Amount paid */}
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-1">Amount paid</label>
-                      <div className="relative">
-                        <FiDollarSign className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <div className="pt-3 border-t border-gray-200">
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        {discountType === "percentage" ? (
+                          <FiPercent className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                        ) : (
+                          <FiDollarSign className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                        )}
                         <input
-                          ref={amountPaidInputRef}
                           type="number"
-                          value={amountPaid}
-                          onChange={(e) => setAmountPaid(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded text-sm"
-                          placeholder="0.00"
+                          value={discountValue}
+                          onChange={(e) => setDiscountValue(e.target.value)}
+                          className="w-full pl-9 pr-4 py-2 border-2 border-gray-200 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                          placeholder={discountType === "percentage" ? "0" : "0.00"}
                           min="0"
-                          step="0.01"
+                          max={discountType === "percentage" ? "100" : calculations.subtotal}
+                          step={discountType === "percentage" ? "1" : "0.01"}
                         />
                       </div>
+                      <button
+                        onClick={() => setDiscountType(discountType === "percentage" ? "amount" : "percentage")}
+                        className="px-4 py-2 border-2 border-gray-200 rounded-xl text-sm font-medium bg-white hover:bg-gray-50 transition-colors"
+                      >
+                        {discountType === "percentage" ? "%" : "$"}
+                      </button>
                     </div>
+                  </div>
 
-                    {/* Select Option - DROPDOWN */}
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-1">Select Option</label>
-                      <div className="relative" ref={paymentDropdownRef}>
-                        <button
-                          onClick={() => setShowPaymentDropdown(!showPaymentDropdown)}
-                          className="w-full p-2 border border-gray-300 rounded text-sm text-left flex items-center justify-between bg-white hover:bg-gray-50"
-                        >
-                          <div className="flex items-center">
-                            {selectedPaymentMethod ? (
-                              <>
-                                <span className="mr-2">{selectedPaymentMethod.icon}</span>
-                                <span>{selectedPaymentMethod.label}</span>
-                              </>
-                            ) : (
+                  <div className="flex justify-between items-center pt-2">
+                    <span className="text-gray-800 font-semibold">Grand Total:</span>
+                    <span className="text-2xl font-bold text-green-600">${grandTotal.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Payment Section */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Payment Details</h3>
+                  
+                  {/* Amount paid */}
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1.5 font-medium">Amount Paid</label>
+                    <div className="relative">
+                      <FiDollarSign className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <input
+                        ref={amountPaidInputRef}
+                        type="number"
+                        value={amountPaid}
+                        onChange={(e) => setAmountPaid(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                        placeholder="0.00"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Payment Method Dropdown */}
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1.5 font-medium">Payment Method</label>
+                    <div className="relative" ref={paymentDropdownRef}>
+                      <button
+                        onClick={() => setShowPaymentDropdown(!showPaymentDropdown)}
+                        className="w-full p-3 border-2 border-gray-200 rounded-xl text-sm text-left flex items-center justify-between bg-white hover:border-blue-500 transition-colors"
+                      >
+                        <div className="flex items-center">
+                          {selectedPaymentMethod ? (
+                            <>
+                              <div className={`h-8 w-8 bg-gradient-to-br ${selectedPaymentMethod.color} rounded-lg flex items-center justify-center mr-3`}>
+                                {selectedPaymentMethod.icon}
+                              </div>
+                              <span className="font-medium">{selectedPaymentMethod.label}</span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="h-8 w-8 bg-gradient-to-br from-gray-200 to-gray-300 rounded-lg flex items-center justify-center mr-3">
+                                <MdPayment className="h-4 w-4 text-gray-600" />
+                              </div>
                               <span className="text-gray-400">Select payment method</span>
-                            )}
-                          </div>
-                          <FiChevronDown className="h-4 w-4 text-gray-400" />
-                        </button>
+                            </>
+                          )}
+                        </div>
+                        <FiChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${showPaymentDropdown ? 'rotate-180' : ''}`} />
+                      </button>
 
-                        {/* Dropdown menu */}
+                      {/* Dropdown menu */}
+                      <AnimatePresence>
                         {showPaymentDropdown && (
-                          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
+                          <motion.div
+                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                            className="absolute z-10 mt-2 w-full bg-white border-2 border-gray-100 rounded-xl shadow-xl overflow-hidden"
+                          >
                             {paymentMethods.map((method) => (
                               <button
                                 key={method.value}
@@ -797,152 +885,196 @@ const CreateSaleNew = () => {
                                   setPaymentMethod(method.value);
                                   setShowPaymentDropdown(false);
                                 }}
-                                className="w-full p-3 text-left flex items-center hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                                className="w-full p-3 text-left flex items-center hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 border-b border-gray-100 last:border-b-0 transition-colors"
                               >
-                                <span className="mr-3">{method.icon}</span>
-                                <span>{method.label}</span>
+                                <div className={`h-8 w-8 bg-gradient-to-br ${method.color} rounded-lg flex items-center justify-center mr-3`}>
+                                  {method.icon}
+                                </div>
+                                <span className="font-medium">{method.label}</span>
                               </button>
                             ))}
-                          </div>
+                          </motion.div>
                         )}
-                      </div>
+                      </AnimatePresence>
                     </div>
+                  </div>
 
-                    {/* Receipt option */}
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-1">Receipt option</label>
-                      <select className="w-full p-2 border border-gray-300 rounded text-sm bg-white">
-                        <option value="">Select receipt option</option>
-                        <option value="print">Print Receipt</option>
-                        <option value="email">Email Receipt</option>
-                        <option value="none">No Receipt</option>
-                      </select>
-                    </div>
+                  {/* Receipt option */}
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1.5 font-medium">Receipt Option</label>
+                    <select className="w-full p-3 border-2 border-gray-200 rounded-xl text-sm bg-white focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all">
+                      <option value="">Select receipt option</option>
+                      <option value="print">🖨️ Print Receipt</option>
+                      <option value="email">📧 Email Receipt</option>
+                      <option value="none">❌ No Receipt</option>
+                    </select>
+                  </div>
 
-                    {/* Due date */}
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-1">Due date</label>
-                      <div className="relative">
-                        <FiCalendar className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                        <input
-                          type="date"
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded text-sm bg-white"
-                          defaultValue={new Date().toISOString().split('T')[0]}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Customer name */}
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-1">Customer name (optional)</label>
-                      <div className="relative">
-                        <FiUser className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                        <input
-                          type="text"
-                          value={customerName}
-                          onChange={(e) => setCustomerName(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded text-sm"
-                          placeholder="Enter customer name"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Customer phone */}
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-1">Customer phone</label>
-                      <div className="flex">
-                        <div className="w-20 p-2 border border-gray-300 border-r-0 rounded-l text-sm bg-gray-50 flex items-center justify-center">
-                          +252
-                        </div>
-                        <div className="relative flex-1">
-                          <FiPhone className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                          <input
-                            type="text"
-                            value={customerPhone}
-                            onChange={(e) => setCustomerPhone(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-r text-sm"
-                            placeholder="61xxxxxx"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Description */}
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-1">Description</label>
-                      <textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded text-sm"
-                        placeholder="Add notes or description..."
-                        rows="3"
+                  {/* Due date */}
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1.5 font-medium">Due Date</label>
+                    <div className="relative">
+                      <FiCalendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <input
+                        type="date"
+                        className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm bg-white focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                        defaultValue={new Date().toISOString().split('T')[0]}
                       />
                     </div>
                   </div>
-                </div>
 
-                {/* Checkout Now Button */}
-                <button
-                  onClick={handleCheckoutNow}
-                  disabled={selectedProducts.length === 0}
-                  className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
-                >
-                  Checkout Now
-                </button>
+                  {/* Customer name */}
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1.5 font-medium">Customer Name (Optional)</label>
+                    <div className="relative">
+                      <FiUser className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                        placeholder="Enter customer name"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Customer phone */}
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1.5 font-medium">Customer Phone</label>
+                    <div className="flex">
+                      <div className="w-20 p-3 border-2 border-r-0 border-gray-200 rounded-l-xl text-sm bg-gradient-to-r from-gray-50 to-gray-100 font-medium flex items-center justify-center">
+                        +252
+                      </div>
+                      <div className="relative flex-1">
+                        <FiPhone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <input
+                          type="text"
+                          value={customerPhone}
+                          onChange={(e) => setCustomerPhone(e.target.value)}
+                          className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-r-xl text-sm focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                          placeholder="61xxxxxx"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1.5 font-medium">Notes</label>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      className="w-full p-3 border-2 border-gray-200 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                      placeholder="Add notes or description..."
+                      rows="3"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+            </motion.div>
 
-            {/* Summary Section */}
-            <div className="bg-white rounded-lg border border-gray-200 p-5">
-              <h3 className="text-md font-semibold text-gray-800 mb-3">Summary</h3>
+            {/* Summary Card with Payment Status */}
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+              className="bg-white rounded-2xl border border-gray-200/60 p-6 shadow-sm hover:shadow-md transition-shadow"
+            >
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <BsWallet2 className="h-5 w-5 text-indigo-600" />
+                Payment Summary
+              </h3>
 
-              <div className="space-y-2">
-                <div className="flex justify-between">
+              <div className="space-y-3">
+                <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Items:</span>
-                  <span>{selectedProducts.length}</span>
+                  <span className="font-medium bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                    {selectedProducts.length}
+                  </span>
                 </div>
 
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Total Quantity:</span>
-                  <span>{selectedProducts.reduce((sum, p) => sum + p.quantity, 0)}</span>
+                  <span className="font-medium">{selectedProducts.reduce((sum, p) => sum + p.quantity, 0)}</span>
                 </div>
 
-                <div className="flex justify-between pt-2 border-t border-gray-200">
-                  <span className="font-medium">Grand Total:</span>
-                  <span className="font-bold">${grandTotal.toFixed(2)}</span>
+                <div className="pt-3 border-t border-gray-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-800 font-semibold">Grand Total:</span>
+                    <span className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                      ${grandTotal.toFixed(2)}
+                    </span>
+                  </div>
                 </div>
 
                 {remainingBalance > 0 && (
-                  <div className="flex justify-between text-amber-600">
-                    <span>Balance Due:</span>
-                    <span className="font-bold">${remainingBalance.toFixed(2)}</span>
-                  </div>
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex justify-between items-center p-3 bg-amber-50 rounded-xl border border-amber-200"
+                  >
+                    <span className="text-amber-700 font-medium flex items-center gap-1">
+                      <FiAlertCircle className="h-4 w-4" />
+                      Balance Due:
+                    </span>
+                    <span className="text-xl font-bold text-amber-600">${remainingBalance.toFixed(2)}</span>
+                  </motion.div>
                 )}
 
                 {changeAmount > 0 && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Change:</span>
-                    <span className="font-bold">${changeAmount.toFixed(2)}</span>
-                  </div>
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex justify-between items-center p-3 bg-green-50 rounded-xl border border-green-200"
+                  >
+                    <span className="text-green-700 font-medium flex items-center gap-1">
+                      <FiCheckCircle className="h-4 w-4" />
+                      Change:
+                    </span>
+                    <span className="text-xl font-bold text-green-600">${changeAmount.toFixed(2)}</span>
+                  </motion.div>
                 )}
 
-                {/* Complete Sale Button */}
-                <button
-                  onClick={handleCompleteSale}
+                {/* Checkout Button - Single Button */}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleCheckout}
                   disabled={loading || selectedProducts.length === 0 || !paymentMethod || !amountDue || !amountPaid}
-                  className="w-full mt-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                  className="w-full mt-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2"
                 >
                   {loading ? (
-                    <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                       Processing...
-                    </div>
+                    </>
                   ) : (
-                    "Complete Sale"
+                    <>
+                      <FiCheckCircle className="h-5 w-5" />
+                      Checkout
+                    </>
                   )}
-                </button>
+                </motion.button>
+
+                {/* Payment Status Indicator */}
+                {selectedProducts.length > 0 && paymentMethod && (
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="mt-4 p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl text-center"
+                  >
+                    <p className="text-xs text-gray-600 flex items-center justify-center gap-2">
+                      <FiClock className="h-3 w-3" />
+                      {parseFloat(amountPaid) >= parseFloat(amountDue) ? (
+                        <span className="text-green-600 font-medium">✓ Fully Paid - Ready to checkout</span>
+                      ) : (
+                        <span className="text-amber-600 font-medium">⚠ Partial Payment - Balance due: ${remainingBalance.toFixed(2)}</span>
+                      )}
+                    </p>
+                  </motion.div>
+                )}
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
       </div>
