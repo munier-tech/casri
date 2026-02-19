@@ -27,8 +27,7 @@ import {
 import { toast } from 'react-hot-toast';
 import axiosInstance from '../../lib/axios';
 
-// ========== MODAL COMPONENTS ==========
-
+// ========== CREATE VENDOR MODAL ==========
 const CreateVendorModal = ({ isOpen, onClose, onCreate }) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -180,6 +179,7 @@ const CreateVendorModal = ({ isOpen, onClose, onCreate }) => {
   );
 };
 
+// ========== EDIT VENDOR MODAL ==========
 const EditVendorModal = ({ isOpen, onClose, vendor, onUpdate }) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -340,6 +340,7 @@ const EditVendorModal = ({ isOpen, onClose, vendor, onUpdate }) => {
   );
 };
 
+// ========== PRODUCT ROW COMPONENT ==========
 const ProductRow = React.memo(({ product, onQuantityChange, onPriceChange, onRemove }) => {
   const total = useMemo(() => {
     const price = parseFloat(product.price) || parseFloat(product.cost) || 0;
@@ -450,6 +451,7 @@ const ProductRow = React.memo(({ product, onQuantityChange, onPriceChange, onRem
   );
 });
 
+// ========== CREATE PURCHASE MODAL ==========
 const CreatePurchaseModal = ({ isOpen, onClose, vendors, onCreate, onSelectVendor }) => {
   const {
     purchaseProducts,
@@ -999,6 +1001,7 @@ const CreatePurchaseModal = ({ isOpen, onClose, vendors, onCreate, onSelectVendo
   );
 };
 
+// ========== PAY VENDOR MODAL ==========
 const PayVendorModal = ({ purchase, onClose, onSuccess }) => {
   const { updatePurchase } = useVendorPurchaseStore();
   const [formData, setFormData] = useState({
@@ -1425,10 +1428,6 @@ const Vendor = () => {
     setSelectedPurchase
   } = useVendorPurchaseStore();
 
-  // Local state for modals if store doesn't have them
-  const [localShowViewModal, setLocalShowViewModal] = useState(false);
-  const [localSelectedPurchase, setLocalSelectedPurchase] = useState(null);
-
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPurchaseForPay, setSelectedPurchaseForPay] = useState(null);
   const [selectedPurchaseForView, setSelectedPurchaseForView] = useState(null);
@@ -1461,23 +1460,14 @@ const Vendor = () => {
     e?.stopPropagation();
     setSelectedPurchaseForPay(purchase);
     setSelectedPurchase(purchase);
-    if (setShowPayModal) {
-      setShowPayModal(true);
-    }
+    setShowPayModal(true);
   };
 
   const handleViewPurchase = (purchase, e) => {
     e?.stopPropagation();
     setSelectedPurchaseForView(purchase);
     setSelectedPurchase(purchase);
-    
-    // Check if store has the view modal state, otherwise use local state
-    if (setShowViewPurchaseModal) {
-      setShowViewPurchaseModal(true);
-    } else {
-      setLocalShowViewModal(true);
-      setLocalSelectedPurchase(purchase);
-    }
+    setShowViewPurchaseModal(true);
   };
 
   const handleDownloadReceipt = (purchase, e) => {
@@ -1547,15 +1537,16 @@ const Vendor = () => {
     toast.success('Data refreshed');
   };
 
-  // Function to close view modal
   const handleCloseViewModal = () => {
-    if (setShowViewPurchaseModal) {
-      setShowViewPurchaseModal(false);
-    } else {
-      setLocalShowViewModal(false);
-      setLocalSelectedPurchase(null);
-    }
+    setShowViewPurchaseModal(false);
     setSelectedPurchaseForView(null);
+    setSelectedPurchase(null);
+  };
+
+  const handleClosePayModal = () => {
+    setShowPayModal(false);
+    setSelectedPurchaseForPay(null);
+    setSelectedPurchase(null);
   };
 
   return (
@@ -1618,10 +1609,10 @@ const Vendor = () => {
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
         >
           {[
-            { label: 'Total Vendors', value: vendors.length, icon: Users, color: 'from-blue-500 to-indigo-600', bgColor: 'bg-blue-50', textColor: 'text-blue-600' },
-            { label: 'Total Purchases', value: purchaseRecords.length, icon: ShoppingCart, color: 'from-green-500 to-emerald-600', bgColor: 'bg-green-50', textColor: 'text-green-600' },
-            { label: 'Total Amount', value: formatCurrency(purchaseRecords.reduce((sum, p) => sum + (p.amountDue || 0), 0)), icon: DollarSign, color: 'from-purple-500 to-pink-600', bgColor: 'bg-purple-50', textColor: 'text-purple-600' },
-            { label: 'Outstanding Balance', value: formatCurrency(purchaseRecords.reduce((sum, p) => sum + ((p.amountDue || 0) - (p.amountPaid || 0)), 0)), icon: AlertCircle, color: 'from-red-500 to-orange-600', bgColor: 'bg-red-50', textColor: 'text-red-600' }
+            { label: 'Total Vendors', value: vendors.length, icon: Users, bgColor: 'bg-blue-50', textColor: 'text-blue-600' },
+            { label: 'Total Purchases', value: purchaseRecords.length, icon: ShoppingCart, bgColor: 'bg-green-50', textColor: 'text-green-600' },
+            { label: 'Total Amount', value: formatCurrency(purchaseRecords.reduce((sum, p) => sum + (p.amountDue || 0), 0)), icon: DollarSign, bgColor: 'bg-purple-50', textColor: 'text-purple-600' },
+            { label: 'Outstanding Balance', value: formatCurrency(purchaseRecords.reduce((sum, p) => sum + ((p.amountDue || 0) - (p.amountPaid || 0)), 0)), icon: AlertCircle, bgColor: 'bg-red-50', textColor: 'text-red-600' }
           ].map((stat, index) => {
             const Icon = stat.icon;
             return (
@@ -1972,10 +1963,7 @@ const Vendor = () => {
         {showPayModal && selectedPurchaseForPay && (
           <PayVendorModal
             purchase={selectedPurchaseForPay}
-            onClose={() => {
-              setShowPayModal(false);
-              setSelectedPurchaseForPay(null);
-            }}
+            onClose={handleClosePayModal}
             onSuccess={() => {
               fetchVendors();
               fetchAllPurchases();
@@ -1983,12 +1971,11 @@ const Vendor = () => {
           />
         )}
 
-        {/* Use either store state or local state for view modal */}
-        {(showViewPurchaseModal || localShowViewModal) && (selectedPurchaseForView || localSelectedPurchase) && (
+        {showViewPurchaseModal && selectedPurchaseForView && (
           <ViewPurchaseModal
-            isOpen={true}
+            isOpen={showViewPurchaseModal}
             onClose={handleCloseViewModal}
-            purchase={selectedPurchaseForView || localSelectedPurchase}
+            purchase={selectedPurchaseForView}
           />
         )}
       </AnimatePresence>

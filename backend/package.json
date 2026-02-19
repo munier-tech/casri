@@ -11,7 +11,9 @@
     "migrate": "npx prisma migrate dev --url \"postgresql://neondb_owner:npg_whOlQLVj7bI8@ep-mute-term-ai2nk1e8-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\"",
     "reset": "npx prisma migrate reset  --url \"postgresql://neondb_owner:npg_whOlQLVj7bI8@ep-mute-term-ai2nk1e8-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\"",
     "push": "npx prisma db push  --url \"postgresql://neondb_owner:npg_whOlQLVj7bI8@ep-mute-term-ai2nk1e8-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\"",
-    "force-reset": "npx prisma db push --force-reset  --url \"postgresql://neondb_owner:npg_whOlQLVj7bI8@ep-mute-term-ai2nk1e8-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\""
+    "force-reset": "npx prisma db push --force-reset  --url \"postgresql://neondb_owner:npg_whOlQLVj7bI8@ep-mute-term-ai2nk1e8-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\"",
+    "vercel-build": "prisma generate",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.0",
