@@ -6,13 +6,13 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "npx nodemon index.js",
-    "studio": "npx prisma studio --url \"postgresql://neondb_owner:npg_whOlQLVj7bI8@ep-mute-term-ai2nk1e8-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\"",
-    "migrate": "npx prisma migrate dev --url \"postgresql://neondb_owner:npg_whOlQLVj7bI8@ep-mute-term-ai2nk1e8-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\"",
-    "reset": "npx prisma migrate reset  --url \"postgresql://neondb_owner:npg_whOlQLVj7bI8@ep-mute-term-ai2nk1e8-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\"",
-    "push": "npx prisma db push  --url \"postgresql://neondb_owner:npg_whOlQLVj7bI8@ep-mute-term-ai2nk1e8-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\"",
-    "force-reset": "npx prisma db push --force-reset  --url \"postgresql://neondb_owner:npg_whOlQLVj7bI8@ep-mute-term-ai2nk1e8-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\"",
-    "vercel-build": "prisma generate",
+    "dev": "nodemon index.js",
+    "studio": "npx prisma studio",
+    "migrate": "npx prisma migrate dev",
+    "reset": "npx prisma migrate reset",
+    "push": "npx prisma db push",
+    "force-reset": "npx prisma db push --force-reset",
+    "vercel-build": "prisma generate && echo '✅ Prisma client generated'",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -27,10 +27,8 @@
     "ioredis": "^5.9.2",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.2",
-    "path": "^0.12.7",
     "pg": "^8.18.0",
-    "redis": "^5.10.0",
-    "yarn": "^1.22.22"
+    "redis": "^5.10.0"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",
