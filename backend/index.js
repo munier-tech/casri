@@ -1,4 +1,3 @@
-// backend/index.js
 import dotenv from "dotenv";
 import express from "express";
 import cookieParser from "cookie-parser";
@@ -7,7 +6,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from 'url';
 
-// Load environment variables FIRST
+// Load environment variables
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -17,12 +16,17 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ==========================
-// ENVIRONMENT CHECK
+// VERBOSE STARTUP LOGGING
 // ==========================
-console.log('🚀 Starting server...');
-console.log('📋 Environment:', process.env.NODE_ENV);
-console.log('🔧 Vercel:', process.env.VERCEL === '1' ? 'Yes' : 'No');
-console.log('💾 Database URL exists:', !!process.env.DATABASE_URL);
+console.log('🚀========== SERVER STARTUP ==========');
+console.log('📋 NODE_ENV:', process.env.NODE_ENV);
+console.log('🔧 VERCEL:', process.env.VERCEL === '1' ? 'Yes' : 'No');
+console.log('📂 Current directory:', process.cwd());
+console.log('📁 __dirname:', __dirname);
+console.log('💾 DATABASE_URL exists:', !!process.env.DATABASE_URL);
+console.log('🔑 TOKEN_SECRET_KEY exists:', !!process.env.TOKEN_SECRET_KEY);
+console.log('🌐 CLIENT_URL:', process.env.CLIENT_URL);
+console.log('=====================================');
 
 // ==========================
 // CORS CONFIG
@@ -30,19 +34,25 @@ console.log('💾 Database URL exists:', !!process.env.DATABASE_URL);
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
-  'https://casri2.vercel.app', // Your frontend URL
+  'https://casri2.vercel.app',
   process.env.CLIENT_URL
 ].filter(Boolean);
+
+console.log('🔓 Allowed CORS origins:', allowedOrigins);
 
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('📡 Request with no origin');
+      return callback(null, true);
+    }
     
     if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      console.log('✅ CORS allowed for:', origin);
       callback(null, true);
     } else {
-      console.log('❌ Blocked origin:', origin);
+      console.log('❌ CORS blocked for:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -59,7 +69,12 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // REQUEST LOGGER
 // ==========================
 app.use((req, _res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  console.log(`📨 ${new Date().toISOString()} - ${req.method} ${req.path}`);
+  console.log('📦 Headers:', {
+    origin: req.headers.origin,
+    'content-type': req.headers['content-type'],
+    cookie: req.headers.cookie ? 'present' : 'none'
+  });
   next();
 });
 
@@ -73,6 +88,7 @@ if (!process.env.VERCEL) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
   app.use("/uploads", express.static(uploadsDir));
+  console.log('📁 Uploads directory created');
 }
 
 // ==========================
@@ -89,71 +105,120 @@ app.get("/health", (_req, res) => {
 });
 
 // ==========================
-// DYNAMIC ROUTE IMPORTS
+// SIMPLE ROUTE TEST (BEFORE DYNAMIC IMPORTS)
+// ==========================
+app.get("/api/test", (req, res) => {
+  console.log('✅ Test route hit');
+  res.json({ message: "Test route working" });
+});
+
+app.get("/api/test-auth", (req, res) => {
+  console.log('✅ Test auth route hit');
+  res.json({ message: "Test auth route working" });
+});
+
+// ==========================
+// DYNAMIC ROUTE IMPORTS WITH ERROR HANDLING
 // ==========================
 async function loadRoutes() {
+  console.log('📝 Starting route imports...');
+  
   try {
-    const authRouter = (await import("./Routes/authRoute.js")).default;
-    const userRouter = (await import("./Routes/userRoute.js")).default;
-    const productRouter = (await import("./Routes/productsRouter.js")).default;
-    const historyRouter = (await import("./Routes/historyRoute.js")).default;
-    const liabilityRouter = (await import("./Routes/LiabilityRoute.js")).default;
-    const financialRouter = (await import("./Routes/financialRoute.js")).default;
-    const categoryRouter = (await import("./Routes/categoryRoute.js")).default;
-    const SalesRouter = (await import("./Routes/salesRoute.js")).default;
-    const uploadRouter = (await import("./Routes/uploadRoute.js")).default;
-    const loanRouter = (await import("./Routes/loanRoute.js")).default;
-    const accountsReceivableRoutes = (await import("./Routes/accountReceivableRouter.js")).default;
-    const purchaseRouter = (await import("./Routes/purchaseRoute.js")).default;
-    const VendorRouter = (await import("./Routes/vendorRoute.js")).default;
-    const reportRouter = (await import("./Routes/ReportsRoute.js")).default;
-    const expenseRoutes = (await import("./Routes/expenseRoute.js")).default;
+    // Try to import auth route first
+    console.log('🔍 Attempting to import authRoute...');
+    let authRouter;
+    try {
+      const authModule = await import("./Routes/authRoute.js");
+      authRouter = authModule.default;
+      console.log('✅ Auth route imported successfully');
+      console.log('📋 Auth router type:', typeof authRouter);
+      console.log('📋 Auth router is function:', typeof authRouter === 'function');
+    } catch (err) {
+      console.error('❌ Failed to import authRoute:', err);
+      authRouter = express.Router();
+      authRouter.get('/error', (req, res) => {
+        res.status(500).json({ error: 'Auth route failed to load', details: err.message });
+      });
+    }
 
-    app.use("/api/auth", authRouter);
-    app.use("/api/user", userRouter);
-    app.use("/api/products", productRouter);
-    app.use("/api/categories", categoryRouter);
-    app.use("/api/upload", uploadRouter);
-    app.use("/api/history", historyRouter);
-    app.use("/api/liability", liabilityRouter);
-    app.use("/api/financial", financialRouter);
-    app.use("/api/sales", SalesRouter);
-    app.use("/api/loans", loanRouter);
-    app.use("/api/purchases", purchaseRouter);
-    app.use("/api/reports", reportRouter);
-    app.use("/api/vendors", VendorRouter);
-    app.use("/api/expenses", expenseRoutes);
-    app.use("/api/receivables", accountsReceivableRoutes);
+    // Register auth routes
+    if (authRouter) {
+      app.use("/api/auth", authRouter);
+      console.log('✅ Auth routes registered at /api/auth');
+    }
 
-    console.log('✅ All routes loaded successfully');
+    // Try to import other routes
+    const routes = [
+      { name: 'userRoute', path: '/api/user' },
+      { name: 'productsRouter', path: '/api/products' },
+      { name: 'categoryRoute', path: '/api/categories' },
+      { name: 'salesRoute', path: '/api/sales' },
+      { name: 'vendorRoute', path: '/api/vendors' },
+      { name: 'purchaseRoute', path: '/api/purchases' },
+      { name: 'expenseRoute', path: '/api/expenses' }
+    ];
+
+    for (const route of routes) {
+      try {
+        console.log(`🔍 Importing ${route.name}...`);
+        const module = await import(`./Routes/${route.name}.js`);
+        if (module.default) {
+          app.use(route.path, module.default);
+          console.log(`✅ ${route.name} registered at ${route.path}`);
+        } else {
+          console.error(`❌ ${route.name} has no default export`);
+        }
+      } catch (err) {
+        console.error(`❌ Failed to import ${route.name}:`, err.message);
+      }
+    }
+
+    console.log('✅ Route loading complete');
   } catch (error) {
-    console.error('❌ Error loading routes:', error);
+    console.error('❌ Fatal error in loadRoutes:', error);
   }
 }
 
-// Load routes
+// Execute route loading
 await loadRoutes();
 
 // ==========================
-// DIAGNOSTIC ROUTE
+// ROUTE LIST DEBUG ENDPOINT
 // ==========================
-app.get("/api", (_req, res) => {
+app.get('/api/debug/routes', (req, res) => {
+  const routes = [];
+  
+  function extractRoutes(stack, basePath = '') {
+    if (!stack) return;
+    
+    stack.forEach(layer => {
+      if (layer.route) {
+        const methods = Object.keys(layer.route.methods).join(', ').toUpperCase();
+        routes.push({
+          path: basePath + layer.route.path,
+          methods
+        });
+      } else if (layer.name === 'router' && layer.handle?.stack) {
+        const routerPath = layer.regexp?.source
+          ?.replace('\\/?(?=\\/|$)', '')
+          .replace(/\\\//g, '/')
+          .replace(/\^/g, '')
+          .replace(/\?/g, '') || '';
+        
+        extractRoutes(layer.handle.stack, routerPath);
+      }
+    });
+  }
+  
+  extractRoutes(app._router?.stack);
+  
+  const apiRoutes = routes.filter(r => r.path.includes('/api/'));
+  
   res.json({
-    message: "CASRI Inventory Management System API is running!",
-    timestamp: new Date().toISOString(),
+    totalRoutes: apiRoutes.length,
     environment: process.env.NODE_ENV,
     vercel: process.env.VERCEL === "1" ? "yes" : "no",
-    database: process.env.DATABASE_URL ? "connected" : "disconnected",
-    routes: [
-      "/api/auth",
-      "/api/user",
-      "/api/products",
-      "/api/categories",
-      "/api/sales",
-      "/api/vendors",
-      "/api/purchases",
-      "/api/expenses"
-    ]
+    routes: apiRoutes.sort((a, b) => a.path.localeCompare(b.path))
   });
 });
 
@@ -161,9 +226,12 @@ app.get("/api", (_req, res) => {
 // 404 HANDLER
 // ==========================
 app.use((req, res) => {
+  console.log('❌ 404 - Route not found:', req.method, req.path);
   res.status(404).json({ 
     error: 'Not Found',
-    path: req.path 
+    path: req.path,
+    method: req.method,
+    message: `Route ${req.method} ${req.path} not found`
   });
 });
 

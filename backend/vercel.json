@@ -5,9 +5,7 @@
       "src": "index.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": [
-          "prisma/**"
-        ]
+        "includeFiles": ["Routes/**", "Controllers/**", "lib/**", "prisma/**"]
       }
     }
   ],
