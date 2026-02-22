@@ -18,6 +18,7 @@ const ProductsManager = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [updatedData, setUpdatedData] = useState({
     name: "",
+    barcode: "",
     cost: "",
     stock: "",
     lowStockThreshold: "",
@@ -33,6 +34,7 @@ const ProductsManager = () => {
   // State for adding new products
   const [singleFormData, setSingleFormData] = useState({
     name: "",
+    barcode: "",
     price: "",
     cost: "",
     inventory: "",
@@ -43,6 +45,7 @@ const ProductsManager = () => {
   const [bulkProducts, setBulkProducts] = useState([
     {
       name: "",
+      barcode: "",
       price: "",
       cost: "",
       inventory: "",
@@ -57,8 +60,9 @@ const ProductsManager = () => {
 
   // Filter products based on search term
   const filteredProducts = products.filter(product =>
-    product.name.includes(searchTerm.toLowerCase()) ||
-    product.description?.includes(searchTerm.toLowerCase())
+    product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.barcode?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Sort products by latest first
@@ -105,6 +109,7 @@ const ProductsManager = () => {
     setEditingProduct(product.id);
     setUpdatedData({
       name: product.name,
+      barcode: product.barcode || "",
       cost: product.cost,
       stock: product.stock,
       lowStockThreshold: product.lowStockThreshold,
@@ -116,6 +121,7 @@ const ProductsManager = () => {
     try {
       const formData = new FormData();
       formData.append("name", updatedData.name);
+      formData.append("barcode", updatedData.barcode);
       formData.append("cost", updatedData.cost);
       formData.append("stock", updatedData.stock);
       formData.append("lowStockThreshold", updatedData.lowStockThreshold);
@@ -132,6 +138,7 @@ const ProductsManager = () => {
     setEditingProduct(null);
     setUpdatedData({
       name: "",
+      barcode: "",
       cost: "",
       stock: "",
       lowStockThreshold: "",
@@ -154,6 +161,7 @@ const ProductsManager = () => {
 
     const submitData = {
       name: singleFormData.name,
+      barcode: singleFormData.barcode,
       cost: singleFormData.cost,
       price: singleFormData.price || singleFormData.cost,
       stock: singleFormData.inventory || 0,
@@ -166,6 +174,7 @@ const ProductsManager = () => {
     toast.success("Product created successfully!");
     setSingleFormData({
       name: "",
+      barcode: "",
       price: "",
       cost: "",
       inventory: "",
@@ -188,6 +197,7 @@ const ProductsManager = () => {
       ...bulkProducts,
       {
         name: "",
+        barcode: "",
         price: "",
         cost: "",
         inventory: "",
@@ -219,6 +229,7 @@ const ProductsManager = () => {
     const submitData = {
       products: validProducts.map(product => ({
         name: product.name,
+        barcode: product.barcode,
         cost: product.cost,
         price: product.price || product.cost,
         stock: product.inventory || 0,
@@ -234,6 +245,7 @@ const ProductsManager = () => {
     setBulkProducts([
       {
         name: "",
+        barcode: "",
         price: "",
         cost: "",
         inventory: "",
@@ -249,6 +261,7 @@ const ProductsManager = () => {
   const resetSingleForm = () => {
     setSingleFormData({
       name: "",
+      barcode: "",
       price: "",
       cost: "",
       inventory: "",
@@ -261,6 +274,7 @@ const ProductsManager = () => {
     setBulkProducts([
       {
         name: "",
+        barcode: "",
         price: "",
         cost: "",
         inventory: "",
@@ -361,6 +375,7 @@ const ProductsManager = () => {
             <tr>
               <th>#</th>
               <th>Product Name</th>
+              <th>Barcode</th>
               <th>Cost Price</th>
               <th>Selling Price</th>
               <th>Stock</th>
@@ -378,6 +393,7 @@ const ProductsManager = () => {
                 <tr>
                   <td class="text-center">${index + 1}</td>
                   <td>${product.name}</td>
+                  <td>${product.barcode || 'N/A'}</td>
                   <td class="text-right">$${parseFloat(product.cost || 0).toFixed(2)}</td>
                   <td class="text-right">$${parseFloat(product.price || product.cost || 0).toFixed(2)}</td>
                   <td class="text-center">${product.stock || 0}</td>
@@ -563,7 +579,7 @@ const ProductsManager = () => {
                 </div>
                 <input
                   type="text"
-                  placeholder="Search products by name..."
+                  placeholder="Search products by name or barcode..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl bg-white placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
@@ -657,7 +673,10 @@ const ProductsManager = () => {
                             className="font-bold text-gray-800 border-b border-blue-300 focus:outline-none"
                           />
                         ) : (
-                          <h3 className="font-bold text-gray-800">{product.name}</h3>
+                          <div>
+                            <h3 className="font-bold text-gray-800">{product.name}</h3>
+                            {product.barcode && <p className="text-xs text-indigo-600">Barcode: {product.barcode}</p>}
+                          </div>
                         )}
                         <div className={`text-xs px-2 py-1 rounded-full ${stockInfo.color} mt-1 inline-block`}>
                           {stockInfo.text}
@@ -674,6 +693,19 @@ const ProductsManager = () => {
 
                   {/* Product Details */}
                   <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Barcode</p>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={updatedData.barcode}
+                          onChange={(e) => setUpdatedData({ ...updatedData, barcode: e.target.value })}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-gray-800"
+                        />
+                      ) : (
+                        <p className="font-semibold text-indigo-600">{product.barcode || "N/A"}</p>
+                      )}
+                    </div>
                     <div>
                       <p className="text-sm text-gray-600">Cost</p>
                       {isEditing ? (
@@ -801,6 +833,7 @@ const ProductsManager = () => {
               <thead className="bg-gradient-to-r from-blue-50 to-indigo-50">
                 <tr>
                   <th className="px-6 py-4 text-blue-700 font-semibold text-left">Product</th>
+                  <th className="px-6 py-4 text-blue-700 font-semibold text-left">Barcode</th>
                   <th className="px-6 py-4 text-blue-700 font-semibold text-left">Cost</th>
                   <th className="px-6 py-4 text-blue-700 font-semibold text-left">Price</th>
                   <th className="px-6 py-4 text-blue-700 font-semibold text-left">Stock</th>
@@ -846,6 +879,19 @@ const ProductsManager = () => {
                               )}
                             </div>
                           </div>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={updatedData.barcode}
+                              onChange={(e) => setUpdatedData({ ...updatedData, barcode: e.target.value })}
+                              className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-gray-800"
+                            />
+                          ) : (
+                            <p className="font-medium text-indigo-600">{product.barcode || "N/A"}</p>
+                          )}
                         </td>
 
                         <td className="px-6 py-4">
@@ -949,7 +995,7 @@ const ProductsManager = () => {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center">
+                    <td colSpan={7} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center justify-center">
                         <FiPackage className="w-16 h-16 text-gray-300 mb-4" />
                         <h3 className="text-lg font-semibold text-gray-800 mb-2">No Products Found</h3>
@@ -1112,6 +1158,20 @@ const ProductsManager = () => {
                       </div>
                     </div>
 
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
+                        Barcode
+                      </label>
+                      <input
+                        type="text"
+                        name="barcode"
+                        value={singleFormData.barcode}
+                        onChange={handleSingleChange}
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Scan or type barcode"
+                      />
+                    </div>
+
                     {/* Price and Cost Row */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
@@ -1244,7 +1304,7 @@ const ProductsManager = () => {
                             )}
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                             <div>
                               <label className="block text-xs font-medium text-gray-600 mb-1">
                                 Name *
@@ -1271,6 +1331,19 @@ const ProductsManager = () => {
                                 step="0.01"
                                 className="w-full px-2 py-1.5 bg-white border border-gray-300 rounded text-gray-800 text-sm"
                                 placeholder="Cost"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Barcode
+                              </label>
+                              <input
+                                type="text"
+                                value={product.barcode}
+                                onChange={(e) => handleBulkChange(index, 'barcode', e.target.value)}
+                                className="w-full px-2 py-1.5 bg-white border border-gray-300 rounded text-gray-800 text-sm"
+                                placeholder="Barcode"
                               />
                             </div>
 

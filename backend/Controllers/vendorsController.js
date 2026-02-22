@@ -1,5 +1,15 @@
 import { prisma } from "../lib/prisma.js";
 
+const isBarcodeUnsupportedError = (error) => {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    error?.code === "P2022" ||
+    (message.includes("barcode") && message.includes("column")) ||
+    (message.includes("unknown argument") && message.includes("barcode")) ||
+    (message.includes("barcode") && message.includes("out of range") && message.includes("integer"))
+  );
+};
+
 export const testVendorAPI = async (req, res) => {
   res.status(200).json({
     success: true,
@@ -211,17 +221,32 @@ export const searchProducts = async (req, res) => {
       });
     }
 
-    const products = await prisma.product.findMany({
-      where: {
-        OR: [
-          { name: { contains: q, mode: 'insensitive' } },
-          { description: { contains: q, mode: 'insensitive' } },
-          { barcode: { contains: q } }
-        ]
-      },
-      take: 20,
-      orderBy: { name: 'asc' }
-    });
+    let products;
+    try {
+      products = await prisma.product.findMany({
+        where: {
+          OR: [
+            { name: { contains: q, mode: 'insensitive' } },
+            { description: { contains: q, mode: 'insensitive' } },
+            { barcode: { contains: q } }
+          ]
+        },
+        take: 20,
+        orderBy: { name: 'asc' }
+      });
+    } catch (error) {
+      if (!isBarcodeUnsupportedError(error)) throw error;
+      products = await prisma.product.findMany({
+        where: {
+          OR: [
+            { name: { contains: q, mode: 'insensitive' } },
+            { description: { contains: q, mode: 'insensitive' } }
+          ]
+        },
+        take: 20,
+        orderBy: { name: 'asc' }
+      });
+    }
 
     res.status(200).json({
       success: true,

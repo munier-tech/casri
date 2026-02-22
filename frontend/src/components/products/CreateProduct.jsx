@@ -14,6 +14,7 @@ const CreateProduct = () => {
   // Single product form data
   const [singleFormData, setSingleFormData] = useState({
     name: "",
+    barcode: "",
     description: "",
     cost: "",
     stock: "",
@@ -25,6 +26,7 @@ const CreateProduct = () => {
   const [bulkProducts, setBulkProducts] = useState([
     {
       name: "",
+      barcode: "",
       description: "",
       cost: "",
       stock: "",
@@ -65,6 +67,7 @@ const CreateProduct = () => {
 
     const submitData = {
       name: singleFormData.name,
+      barcode: singleFormData.barcode,
       description: singleFormData.description,
       cost: singleFormData.cost,
       stock: singleFormData.stock,
@@ -78,6 +81,7 @@ const CreateProduct = () => {
       setSuccessMessage("Alaabta si guul leh ayaa loo abuuray!");
       setSingleFormData({
         name: "",
+        barcode: "",
         description: "",
         cost: "",
         stock: "",
@@ -99,6 +103,7 @@ const CreateProduct = () => {
       ...bulkProducts,
       {
         name: "",
+        barcode: "",
         description: "",
         cost: "",
         stock: "",
@@ -138,6 +143,7 @@ const CreateProduct = () => {
     const submitData = {
       products: validProducts.map(product => ({
         name: product.name,
+        barcode: product.barcode,
         description: product.description,
         cost: product.cost,
         stock: product.stock || 0,
@@ -160,6 +166,7 @@ const CreateProduct = () => {
       setBulkProducts([
         {
           name: "",
+          barcode: "",
           description: "",
           cost: "",
           stock: "",
@@ -174,6 +181,7 @@ const CreateProduct = () => {
     setBulkProducts([
       {
         name: "",
+        barcode: "",
         description: "",
         cost: "",
         stock: "",
@@ -301,6 +309,21 @@ const CreateProduct = () => {
                     required
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                     placeholder="Geli magaca alaabta"
+                  />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Barcode Number
+                  </label>
+                  <input
+                    type="text"
+                    name="barcode"
+                    value={singleFormData.barcode}
+                    onChange={handleSingleChange}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    placeholder="Scan or type barcode"
                   />
                 </div>
 
@@ -479,7 +502,7 @@ const CreateProduct = () => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                       {/* Name */}
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -507,6 +530,20 @@ const CreateProduct = () => {
                           step="0.01"
                           className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           placeholder="0.00"
+                        />
+                      </div>
+
+                      {/* Barcode */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Barcode
+                        </label>
+                        <input
+                          type="text"
+                          value={product.barcode}
+                          onChange={(e) => handleBulkChange(index, 'barcode', e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Barcode"
                         />
                       </div>
 

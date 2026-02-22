@@ -23,16 +23,19 @@ const useSalesStore = create((set, get) => ({
     set({ loading: true, error: null });
     try {
       const res = await axios.get(`/sales/products/search?search=${encodeURIComponent(searchTerm)}`);
+      const products = res.data.products || [];
       set({
-        searchResults: res.data.products || [],
+        searchResults: products,
         loading: false
       });
+      return products;
     } catch (err) {
       set({
         error: err.response?.data?.error || "Failed to search products",
         searchResults: [],
         loading: false,
       });
+      return [];
     }
   },
 

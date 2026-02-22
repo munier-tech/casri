@@ -2,7 +2,7 @@
 import { create } from "zustand";
 import axios from "../lib/axios"; // ✅ your custom axios instance
 
-const useProductsStore = create((set) => ({
+const useProductsStore = create((set, get) => ({
   products: [],
   loading: false,
   error: null,
@@ -46,14 +46,22 @@ const useProductsStore = create((set) => ({
     set({ loading: true, error: null });
     try {
       const res = await axios.post("/products", productData);
-      // Backend returns { success: true, message: "...", product: {...} }
-      const newProduct = res.data.product || res.data;
-      set((state) => ({ products: [...state.products, newProduct], loading: false }));
+      const newProduct = res.data?.product;
+
+      if (newProduct && newProduct.id) {
+        set((state) => ({ products: [newProduct, ...state.products], loading: false }));
+      } else {
+        await get().fetchProducts();
+        set({ loading: false });
+      }
+
+      return res.data;
     } catch (err) {
       set({
-        error: err.response?.data?.message || "Failed to create product",
+        error: err.response?.data?.error || err.response?.data?.message || "Failed to create product",
         loading: false
       });
+      throw err;
     }
   },
 
@@ -72,7 +80,7 @@ const useProductsStore = create((set) => ({
       }));
     } catch (err) {
       set({
-        error: err.response?.data?.message || "Failed to update product",
+        error: err.response?.data?.error || err.response?.data?.message || "Failed to update product",
         loading: false
       });
     }
@@ -89,7 +97,7 @@ const useProductsStore = create((set) => ({
       }));
     } catch (err) {
       set({
-        error: err.response?.data?.message || "Failed to delete product",
+        error: err.response?.data?.error || err.response?.data?.message || "Failed to delete product",
         loading: false
       });
     }

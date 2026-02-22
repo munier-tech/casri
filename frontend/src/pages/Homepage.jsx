@@ -21,7 +21,8 @@ import {
   FiCreditCard,
   FiCheckCircle,
   FiClock,
-  FiAlertCircle
+  FiAlertCircle,
+  FiSettings
 } from "react-icons/fi";
 import {
   BsCashCoin,
@@ -31,6 +32,7 @@ import {
 import { MdPayment, MdReceipt } from "react-icons/md";
 import useProductsStore from "../store/useProductsStore";
 import useSalesStore from "../store/UseSalesStore";
+import useReceiptSettingsStore from "../store/useReceiptSettingsStore";
 import { DollarSign } from "lucide-react";
 
 // Memoized Product Row Component
@@ -60,6 +62,9 @@ const ProductRow = React.memo(({
           <div>
             <p className="font-medium text-gray-900">{product.name}</p>
             <p className="text-xs text-gray-500">ID: {product.id.slice(0, 8)}</p>
+            {product.barcode && (
+              <p className="text-xs text-indigo-600">Barcode: {product.barcode}</p>
+            )}
           </div>
         </div>
       </td>
@@ -149,6 +154,12 @@ const ProductRow = React.memo(({
 const CreateSaleNew = () => {
   const { fetchProducts } = useProductsStore();
   const {
+    settings: receiptSettings,
+    fetchReceiptSettings,
+    saveReceiptSettings,
+    saving: savingReceiptSettings
+  } = useReceiptSettingsStore();
+  const {
     searchProducts,
     searchResults,
     addProductToSale,
@@ -186,6 +197,15 @@ const CreateSaleNew = () => {
   const [discountValue, setDiscountValue] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [showPaymentDropdown, setShowPaymentDropdown] = useState(false);
+  const [receiptOption, setReceiptOption] = useState("print");
+  const [settingsDraft, setSettingsDraft] = useState({
+    storeName: "CASRI INVENTORY",
+    footerMessage: "Thank you for your business!",
+    includeItemBarcode: true,
+    barcodeWrapper: "*",
+    barcodeFontSize: 36,
+    showSaleBarcode: true,
+  });
   const [activeTab, setActiveTab] = useState("cart");
 
   // Refs
@@ -237,7 +257,8 @@ const CreateSaleNew = () => {
     const initData = async () => {
       await Promise.all([
         fetchProducts(),
-        fetchDailySales()
+        fetchDailySales(),
+        fetchReceiptSettings()
       ]);
     };
     
@@ -246,7 +267,20 @@ const CreateSaleNew = () => {
     if (searchInputRef.current) {
       searchInputRef.current.focus();
     }
-  }, [fetchProducts, fetchDailySales]);
+  }, [fetchProducts, fetchDailySales, fetchReceiptSettings]);
+
+  useEffect(() => {
+    if (receiptSettings) {
+      setSettingsDraft({
+        storeName: receiptSettings.storeName || "CASRI INVENTORY",
+        footerMessage: receiptSettings.footerMessage || "Thank you for your business!",
+        includeItemBarcode: receiptSettings.includeItemBarcode !== false,
+        barcodeWrapper: receiptSettings.barcodeWrapper || "*",
+        barcodeFontSize: receiptSettings.barcodeFontSize || 36,
+        showSaleBarcode: receiptSettings.showSaleBarcode !== false,
+      });
+    }
+  }, [receiptSettings]);
 
   // Set amount due automatically when grand total changes
   useEffect(() => {
@@ -308,6 +342,47 @@ const CreateSaleNew = () => {
       searchInputRef.current.focus();
     }
   }, [addProductToSale]);
+
+  const handleSearchKeyDown = useCallback(async (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+
+    const normalizedTerm = searchTerm.trim();
+    if (!normalizedTerm) return;
+
+    let candidates = searchResults;
+    if (candidates.length === 0) {
+      candidates = await searchProducts(normalizedTerm);
+    }
+
+    const exactBarcodeMatch = candidates.find(
+      (product) => product.barcode && String(product.barcode).trim() === normalizedTerm
+    );
+
+    if (exactBarcodeMatch) {
+      handleProductSelect(exactBarcodeMatch);
+      return;
+    }
+
+    if (candidates.length > 0) {
+      handleProductSelect(candidates[0]);
+      return;
+    }
+
+    toast.error("No product found for this barcode");
+  }, [searchResults, searchTerm, handleProductSelect, searchProducts]);
+
+  const saveReceiptSettingsChanges = useCallback(async () => {
+    try {
+      await saveReceiptSettings({
+        ...settingsDraft,
+        barcodeFontSize: Number(settingsDraft.barcodeFontSize) || 36,
+      });
+      toast.success("Receipt barcode settings saved");
+    } catch (error) {
+      toast.error(error.message || "Failed to save receipt settings");
+    }
+  }, [saveReceiptSettings, settingsDraft]);
 
   const handleQuantityChange = useCallback((productId, quantity) => {
     if (quantity >= 1) {
@@ -390,6 +465,10 @@ const CreateSaleNew = () => {
         }
       }
 
+      if (receiptOption === "print") {
+        handlePrintReceipt();
+      }
+
       // Clear form
       clearSelectedProducts();
       setAmountDue("");
@@ -424,8 +503,10 @@ const CreateSaleNew = () => {
     notes,
     discountType,
     discountValue,
+    settingsDraft,
     createSale,
     createSaleByDate,
+    receiptOption,
     clearSelectedProducts,
     fetchDailySales
   ]);
@@ -436,11 +517,18 @@ const CreateSaleNew = () => {
       return;
     }
 
+    const receiptNumber = Date.now().toString().slice(-8);
+    const storeName = settingsDraft.storeName || "CASRI INVENTORY";
+    const footerMessage = settingsDraft.footerMessage || "Thank you for your business!";
+    const barcodeWrapper = settingsDraft.barcodeWrapper || "*";
+    const barcodeFontSize = Number(settingsDraft.barcodeFontSize) || 36;
+
     const printContent = `
       <!DOCTYPE html>
       <html>
       <head>
         <title>Sale Receipt</title>
+        <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+39+Text&display=swap" rel="stylesheet">
         <style>
           body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 20px; background: #f3f4f6; }
           .receipt { max-width: 320px; margin: 0 auto; background: white; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); overflow: hidden; }
@@ -454,13 +542,14 @@ const CreateSaleNew = () => {
           .status-badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
           .paid { background: #d1fae5; color: #065f46; }
           .partial { background: #fef3c7; color: #92400e; }
+          .barcode { font-family: 'Libre Barcode 39 Text', monospace; letter-spacing: 1px; text-align: center; line-height: 1; }
           .footer { text-align: center; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; }
         </style>
       </head>
       <body>
         <div class="receipt">
           <div class="header">
-            <h2>INVENTORY PRO</h2>
+            <h2>${storeName}</h2>
             <p>${saleType === "date" ? new Date(saleDate).toLocaleDateString() : new Date().toLocaleDateString()}</p>
             <p>${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
           </div>
@@ -470,6 +559,10 @@ const CreateSaleNew = () => {
                 <span>${item.name} x${item.quantity}</span>
                 <span>$${(item.sellingPrice * item.quantity).toFixed(2)}</span>
               </div>
+              ${settingsDraft.includeItemBarcode && item.barcode ? `
+                <div class="barcode" style="font-size:${barcodeFontSize}px;">${barcodeWrapper}${item.barcode}${barcodeWrapper}</div>
+                <div style="text-align:center;font-size:11px;color:#6b7280;margin-bottom:8px;">${item.barcode}</div>
+              ` : ""}
             `).join('')}
             <div class="divider"></div>
             <div class="row">
@@ -509,9 +602,15 @@ const CreateSaleNew = () => {
                 ${paidAmount >= dueAmount ? '✓ FULLY PAID' : '⏱ PARTIALLY PAID'}
               </span>
             </div>
+            ${settingsDraft.showSaleBarcode ? `
+              <div style="margin-top:16px;">
+                <div class="barcode" style="font-size:${barcodeFontSize}px;">${barcodeWrapper}${receiptNumber}${barcodeWrapper}</div>
+                <div style="text-align:center;font-size:11px;color:#6b7280;">SALE ${receiptNumber}</div>
+              </div>
+            ` : ""}
             <div class="footer">
-              <p>Thank you for your business!</p>
-              <p>Receipt #: ${Date.now().toString().slice(-8)}</p>
+              <p>${footerMessage}</p>
+              <p>Receipt #: ${receiptNumber}</p>
             </div>
           </div>
         </div>
@@ -527,7 +626,7 @@ const CreateSaleNew = () => {
       printWindow.print();
       printWindow.close();
     }, 250);
-  }, [selectedProducts, saleType, saleDate, calculations.subtotal, discountAmount, amountDue, grandTotal, paidAmount, dueAmount, remainingBalance, changeAmount, paymentMethod]);
+  }, [selectedProducts, saleType, saleDate, calculations.subtotal, discountAmount, amountDue, grandTotal, paidAmount, dueAmount, remainingBalance, changeAmount, paymentMethod, settingsDraft]);
 
   // Payment methods
   const paymentMethods = useMemo(() => [
@@ -643,6 +742,7 @@ const CreateSaleNew = () => {
                     placeholder="Search products or scan barcodes..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={handleSearchKeyDown}
                     className="w-full pl-12 pr-12 py-3.5 border-2 border-gray-200 rounded-xl bg-white placeholder-gray-400 text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all"
                   />
                   {searchTerm && (
@@ -687,6 +787,9 @@ const CreateSaleNew = () => {
                                     Stock: {product.stock}
                                   </span>
                                 </div>
+                                {product.barcode && (
+                                  <p className="text-xs text-indigo-600 mt-1">Barcode: {product.barcode}</p>
+                                )}
                               </div>
                             </div>
                             <div className="h-8 w-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center text-white">
@@ -902,12 +1005,103 @@ const CreateSaleNew = () => {
                   {/* Receipt option */}
                   <div>
                     <label className="block text-sm text-gray-600 mb-1.5 font-medium">Receipt Option</label>
-                    <select className="w-full p-3 border-2 border-gray-200 rounded-xl text-sm bg-white focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all">
+                    <select
+                      value={receiptOption}
+                      onChange={(e) => setReceiptOption(e.target.value)}
+                      className="w-full p-3 border-2 border-gray-200 rounded-xl text-sm bg-white focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                    >
                       <option value="">Select receipt option</option>
                       <option value="print">🖨️ Print Receipt</option>
                       <option value="email">📧 Email Receipt</option>
                       <option value="none">❌ No Receipt</option>
                     </select>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/70">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        <FiSettings className="h-4 w-4" />
+                        Barcode Print Settings
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={saveReceiptSettingsChanges}
+                        disabled={savingReceiptSettings}
+                        className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+                      >
+                        {savingReceiptSettings ? "Saving..." : "Save"}
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                      <input
+                        type="text"
+                        value={settingsDraft.storeName}
+                        onChange={(e) => setSettingsDraft((prev) => ({ ...prev, storeName: e.target.value }))}
+                        placeholder="Store name"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      />
+                      <input
+                        type="text"
+                        value={settingsDraft.footerMessage}
+                        onChange={(e) => setSettingsDraft((prev) => ({ ...prev, footerMessage: e.target.value }))}
+                        placeholder="Footer message"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      />
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-gray-600">Barcode wrapper</label>
+                        <input
+                          type="text"
+                          value={settingsDraft.barcodeWrapper}
+                          onChange={(e) => setSettingsDraft((prev) => ({ ...prev, barcodeWrapper: e.target.value.slice(0, 2) }))}
+                          className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg text-sm"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-gray-600">Barcode font</label>
+                        <input
+                          type="number"
+                          min="18"
+                          max="72"
+                          value={settingsDraft.barcodeFontSize}
+                          onChange={(e) => setSettingsDraft((prev) => ({ ...prev, barcodeFontSize: e.target.value }))}
+                          className="w-24 px-2 py-1.5 border border-gray-300 rounded-lg text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-4 mb-3">
+                      <label className="flex items-center gap-2 text-xs text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={settingsDraft.includeItemBarcode}
+                          onChange={(e) => setSettingsDraft((prev) => ({ ...prev, includeItemBarcode: e.target.checked }))}
+                        />
+                        Show item barcode
+                      </label>
+                      <label className="flex items-center gap-2 text-xs text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={settingsDraft.showSaleBarcode}
+                          onChange={(e) => setSettingsDraft((prev) => ({ ...prev, showSaleBarcode: e.target.checked }))}
+                        />
+                        Show sale barcode
+                      </label>
+                    </div>
+
+                    <div className="rounded-lg border border-dashed border-gray-300 bg-white p-3">
+                      <p className="text-xs text-gray-500 mb-1">Barcode preview</p>
+                      <p
+                        className="text-center text-gray-900 leading-none"
+                        style={{
+                          fontSize: `${Number(settingsDraft.barcodeFontSize) || 36}px`,
+                          fontFamily: "'Libre Barcode 39 Text', monospace"
+                        }}
+                      >
+                        {(settingsDraft.barcodeWrapper || "*")}12345678{(settingsDraft.barcodeWrapper || "*")}
+                      </p>
+                      <p className="text-center text-xs text-gray-500 mt-1">12345678</p>
+                    </div>
                   </div>
 
                   {/* Due date */}

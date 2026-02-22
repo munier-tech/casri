@@ -155,7 +155,8 @@ async function loadRoutes() {
       { name: 'salesRoute', path: '/api/sales' },
       { name: 'vendorRoute', path: '/api/vendors' },
       { name: 'purchaseRoute', path: '/api/purchases' },
-      { name: 'expenseRoute', path: '/api/expenses' }
+      { name: 'expenseRoute', path: '/api/expenses' },
+      { name: 'settingsRoute', path: '/api/settings' }
     ];
 
     for (const route of routes) {

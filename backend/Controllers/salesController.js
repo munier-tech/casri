@@ -48,6 +48,16 @@ const determineSaleStatus = (paid, due) => {
   return 'PENDING';
 };
 
+const isBarcodeUnsupportedError = (error) => {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    error?.code === "P2022" ||
+    (message.includes("barcode") && message.includes("column")) ||
+    (message.includes("unknown argument") && message.includes("barcode")) ||
+    (message.includes("barcode") && message.includes("out of range") && message.includes("integer"))
+  );
+};
+
 // ========== MAIN SALE FUNCTIONS ==========
 
 // ✅ Create Multiple Products Sale (New System with amountDue and amountPaid)
@@ -350,29 +360,58 @@ export const searchProductsForSale = async (req, res) => {
     if (search && search.trim() !== '') {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } }
+        { description: { contains: search, mode: 'insensitive' } },
+        { barcode: { contains: search } }
       ];
     }
 
-    const products = await prisma.product.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        cost: true,
-        price: true,
-        stock: true,
-        lowStockThreshold: true,
-        expiryDate: true,
-        description: true
-      },
-      orderBy: { name: 'asc' },
-      take: 20
-    });
+    let products;
+    try {
+      products = await prisma.product.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          barcode: true,
+          cost: true,
+          price: true,
+          stock: true,
+          lowStockThreshold: true,
+          expiryDate: true,
+          description: true
+        },
+        orderBy: { name: 'asc' },
+        take: 20
+      });
+    } catch (error) {
+      if (!isBarcodeUnsupportedError(error)) throw error;
+
+      const fallbackWhere = { ...where };
+      if (Array.isArray(fallbackWhere.OR)) {
+        fallbackWhere.OR = fallbackWhere.OR.filter((cond) => !Object.prototype.hasOwnProperty.call(cond, "barcode"));
+      }
+
+      products = await prisma.product.findMany({
+        where: fallbackWhere,
+        select: {
+          id: true,
+          name: true,
+          cost: true,
+          price: true,
+          stock: true,
+          lowStockThreshold: true,
+          expiryDate: true,
+          description: true
+        },
+        orderBy: { name: 'asc' },
+        take: 20
+      });
+    }
 
     const formattedProducts = products.map(product => ({
       id: product.id,
       name: product.name,
+      barcode: product.barcode || null,
       description: product.description,
       cost: product.cost,
       price: product.price || product.cost,
