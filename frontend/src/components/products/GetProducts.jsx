@@ -76,6 +76,13 @@ const ProductsManager = () => {
   const endIndex = startIndex + itemsPerPage;
   const currentProducts = sortedProducts.slice(startIndex, endIndex);
 
+  useEffect(() => {
+    const safeTotalPages = Math.max(1, totalPages);
+    if (currentPage > safeTotalPages) {
+      setCurrentPage(safeTotalPages);
+    }
+  }, [currentPage, totalPages]);
+
   // Calculate totals
   const totalInventoryValue = products.reduce((total, product) => {
     return total + (parseFloat(product.cost) || 0) * (parseInt(product.stock) || 0);
@@ -99,8 +106,8 @@ const ProductsManager = () => {
         await deleteProduct(id);
         toast.success("Product deleted successfully");
         setShowMobileActions(null);
-      } catch {
-        toast.error("Error deleting product");
+      } catch (error) {
+        toast.error(error?.response?.data?.message || "Error deleting product");
       }
     }
   };

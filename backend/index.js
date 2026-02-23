@@ -153,6 +153,8 @@ async function loadRoutes() {
       { name: 'productsRouter', path: '/api/products' },
       { name: 'categoryRoute', path: '/api/categories' },
       { name: 'salesRoute', path: '/api/sales' },
+      { name: 'LiabilityRoute', path: '/api/Liability' },
+      { name: 'LiabilityRoute', path: '/api/liability' },
       { name: 'vendorRoute', path: '/api/vendors' },
       { name: 'purchaseRoute', path: '/api/purchases' },
       { name: 'expenseRoute', path: '/api/expenses' },

@@ -92,14 +92,18 @@ const useProductsStore = create((set, get) => ({
     try {
       await axios.delete(`/products/${id}`);
       set((state) => ({
-        products: state.products.filter((product) => product.id !== id),
+        products: state.products.filter((product) => String(product.id) !== String(id)),
         loading: false,
       }));
+      // Keep UI in sync with backend source of truth after delete
+      await get().fetchProducts();
+      return true;
     } catch (err) {
       set({
         error: err.response?.data?.error || err.response?.data?.message || "Failed to delete product",
         loading: false
       });
+      throw err;
     }
   },
 }));

@@ -372,8 +372,30 @@ export const deleteProduct = async (req, res) => {
       });
     }
 
-    await prisma.product.delete({
-      where: { id: req.params.id },
+    await prisma.$transaction(async (tx) => {
+      // Keep sale history record, but remove product-linked line items.
+      await tx.saleProduct.deleteMany({
+        where: { productId: req.params.id },
+      });
+
+      await tx.historyProduct.deleteMany({
+        where: { productId: req.params.id },
+      });
+
+      // Optional product relations can be nulled out.
+      await tx.purchase.updateMany({
+        where: { productId: req.params.id },
+        data: { productId: null },
+      });
+
+      await tx.purchaseProduct.updateMany({
+        where: { productId: req.params.id },
+        data: { productId: null },
+      });
+
+      await tx.product.delete({
+        where: { id: req.params.id },
+      });
     });
 
     res.status(200).json({

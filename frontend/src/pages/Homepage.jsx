@@ -174,6 +174,7 @@ const CreateSaleNew = () => {
     createSaleByDate,
     loading,
     fetchDailySales,
+    fetchSalesByDate,
     salesByDate
   } = useSalesStore();
 
@@ -181,6 +182,7 @@ const CreateSaleNew = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [saleType, setSaleType] = useState("today");
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
+  const [salesLookupDate, setSalesLookupDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Payment fields
   const [paymentMethod, setPaymentMethod] = useState("");
@@ -206,7 +208,6 @@ const CreateSaleNew = () => {
     barcodeFontSize: 36,
     showSaleBarcode: true,
   });
-  const [activeTab, setActiveTab] = useState("cart");
 
   // Refs
   const searchInputRef = useRef(null);
@@ -281,6 +282,12 @@ const CreateSaleNew = () => {
       });
     }
   }, [receiptSettings]);
+
+  useEffect(() => {
+    if (saleType === "salesByDate") {
+      fetchSalesByDate(salesLookupDate);
+    }
+  }, [saleType, salesLookupDate, fetchSalesByDate]);
 
   // Set amount due automatically when grand total changes
   useEffect(() => {
@@ -680,25 +687,88 @@ const CreateSaleNew = () => {
           </div>
         </motion.div>
 
-        {/* Tabs for better organization */}
+        {/* Checkout Mode Tabs */}
         <div className="flex gap-2 mb-6">
-          {['cart', 'customer', 'payment'].map((tab) => (
+          {[
+            { id: "today", label: "Regular Checkout" },
+            { id: "date", label: "Sale By Date" },
+            { id: "salesByDate", label: "Sales By Date" }
+          ].map((tab) => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
+              key={tab.id}
+              onClick={() => setSaleType(tab.id)}
               className={`px-4 py-2 rounded-xl text-sm font-medium capitalize transition-all ${
-                activeTab === tab 
+                saleType === tab.id
                   ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg' 
                   : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
               }`}
             >
-              {tab}
+              {tab.label}
             </button>
           ))}
         </div>
 
+        {saleType === "salesByDate" && (
+          <div className="bg-white rounded-2xl border border-gray-200/60 p-5 shadow-sm mb-6">
+            <div className="flex flex-col md:flex-row md:items-end gap-3 mb-4">
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Date</label>
+                <input
+                  type="date"
+                  value={salesLookupDate}
+                  onChange={(e) => setSalesLookupDate(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <button
+                onClick={() => fetchSalesByDate(salesLookupDate)}
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+              >
+                Load Sales
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Sale #</th>
+                    <th className="px-4 py-3 text-left">Customer</th>
+                    <th className="px-4 py-3 text-left">Payment</th>
+                    <th className="px-4 py-3 text-right">Grand Total</th>
+                    <th className="px-4 py-3 text-right">Paid</th>
+                    <th className="px-4 py-3 text-right">Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salesByDate.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-6 text-center text-gray-500">
+                        No sales found for this date
+                      </td>
+                    </tr>
+                  ) : (
+                    salesByDate.map((sale) => (
+                      <tr key={sale.id} className="border-t border-gray-100">
+                        <td className="px-4 py-3">{sale.saleNumber || "-"}</td>
+                        <td className="px-4 py-3">{sale.customerName || "Walk-in Customer"}</td>
+                        <td className="px-4 py-3 capitalize">{sale.paymentMethod || "-"}</td>
+                        <td className="px-4 py-3 text-right">${Number(sale.grandTotal || 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right">${Number(sale.amountPaid || 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-amber-700">
+                          ${Number(sale.remainingBalance || 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className={`${saleType === "salesByDate" ? "hidden" : "grid grid-cols-1 lg:grid-cols-3 gap-6"}`}>
 
           {/* Left Column - Cart Section */}
           <div className="lg:col-span-2 space-y-6">
@@ -925,6 +995,21 @@ const CreateSaleNew = () => {
                 {/* Payment Section */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Payment Details</h3>
+
+                  {saleType === "date" && (
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1.5 font-medium">Sale Date</label>
+                      <div className="relative">
+                        <FiCalendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <input
+                          type="date"
+                          value={saleDate}
+                          onChange={(e) => setSaleDate(e.target.value)}
+                          className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm bg-white focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Amount paid */}
                   <div>
@@ -1245,7 +1330,7 @@ const CreateSaleNew = () => {
                   ) : (
                     <>
                       <FiCheckCircle className="h-5 w-5" />
-                      Checkout
+                      {saleType === "date" ? "Create Sale By Date" : "Checkout"}
                     </>
                   )}
                 </motion.button>

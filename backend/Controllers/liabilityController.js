@@ -6,8 +6,8 @@ export const addLiabilityToDailySales = async (req, res) => {
     const { name, price, description, quantity } = req.body || {};
     const userId = req.user.id || req.user._id;
 
-    if (!name || price === undefined || !description || !quantity) {
-      return res.status(400).json({ message: "All product fields are required." });
+    if (!name || price === undefined || !quantity) {
+      return res.status(400).json({ message: "Name, amount and quantity are required." });
     }
 
     const parsedQuantity = parseInt(quantity, 10);
@@ -21,7 +21,7 @@ export const addLiabilityToDailySales = async (req, res) => {
         data: {
           name,
           price: parseFloat(price),
-          description,
+          description: description?.trim() || "",
           quantity: parsedQuantity,
           userId,
           soldAt: dayjs().startOf('day').toDate(),
@@ -72,11 +72,6 @@ export const getAllLiabilities = async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
     const liabilities = await prisma.liability.findMany({ where: { userId } });
-
-    if (!liabilities || liabilities.length === 0) {
-      return res.status(404).json({ message: "No liabilities found." });
-    }
-
     res.status(200).json({ message: "All liabilities fetched successfully.", liabilities });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -139,7 +134,6 @@ export const deleteLiability = async (req, res) => {
     res.status(404).json({ message: "Liability not found or error deleting." });
   }
 };
-
 
 
 

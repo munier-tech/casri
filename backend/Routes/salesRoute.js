@@ -1,6 +1,5 @@
 import express from "express";
 import {
-  createSaleByDate,
   createMultipleProductsSale,
   searchProductsForSale,
   getSales,
@@ -20,6 +19,7 @@ import {
   getPaymentMethodsStats,
   getPaymentMethodTransactions
 } from "../Controllers/salesController.js";
+import { createSaleByDateController } from "../Controllers/createSaleByDateController.js";
 import { adminRoute, protectedRoute } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
@@ -31,7 +31,7 @@ router.get("/products/search", protectedRoute, searchProductsForSale);
 
 // Create sales
 router.post("/", protectedRoute, createMultipleProductsSale);
-router.post("/by-date", protectedRoute, createSaleByDate);
+router.post("/by-date", protectedRoute, createSaleByDateController);
 router.post("/multiple", protectedRoute, createMultipleProductsSale);
 
 // Sales data

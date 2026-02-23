@@ -18,8 +18,9 @@ export const useLiabilityStore = create((set) => ({
     try {
       set({ isLoading: true });
       const { data } = await axios.post("/Liability/addLiability", liabilityData);
+      const created = data.product || data.liability || data;
       set((state) => ({
-        liabilities: [...state.liabilities, data],
+        liabilities: created?.id ? [...state.liabilities, created] : state.liabilities,
         isLoading: false,
       }));
       toast.success("Liability added successfully");
@@ -34,10 +35,13 @@ export const useLiabilityStore = create((set) => ({
       set({ isLoading: true });
       const response = await axios.get("/Liability/getAll");
       set({ liabilities: response.data.liabilities || [], isLoading: false });
-      toast.success("Liabilities fetched successfully");
     } catch (error) {
+      if (error?.response?.status === 404) {
+        set({ isLoading: false, liabilities: [] });
+        return;
+      }
       toast.error(error?.response?.data?.message || "Error fetching liabilities");
-      set({ isLoading: false });
+      set({ isLoading: false, liabilities: [] });
     }
   },
 
@@ -89,4 +93,3 @@ export const useLiabilityStore = create((set) => ({
     }
   }
 }));
-

@@ -43,6 +43,7 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import useProductsStore from "../store/useProductsStore";
 import useSalesStore from "../store/UseSalesStore";
 import { useUserStore } from "../store/useUserStore";
+import axios from "../lib/axios";
 import { BsCart } from "react-icons/bs";
 
 const Dashboard = ({ activeTab: initialActiveTab }) => {
@@ -142,7 +143,7 @@ const Dashboard = ({ activeTab: initialActiveTab }) => {
     },
     {
       id: "loans",
-      label: "Loans",
+      label: "Account Payables",
       icon: DollarSign,
       color: "from-yellow-500 to-yellow-600",
       gradient: "bg-gradient-to-r from-yellow-500 to-yellow-600",
@@ -523,11 +524,39 @@ const DashboardStats = () => {
   const navigate = useNavigate();
   const { products } = useProductsStore();
   const { sales, fetchSales, paymentMethodsStats, fetchPaymentMethodsStats } = useSalesStore();
+  const [accountsPayableAmount, setAccountsPayableAmount] = useState(0);
+  const [accountsPayablePending, setAccountsPayablePending] = useState(0);
 
   useEffect(() => {
     fetchSales();
     fetchPaymentMethodsStats();
   }, [fetchSales, fetchPaymentMethodsStats]);
+
+  useEffect(() => {
+    const fetchPayables = async () => {
+      try {
+        const { data } = await axios.get("/Liability/getAll");
+        const liabilities = data?.liabilities || [];
+        const unpaid = liabilities.filter((item) => !item.isPaid);
+        const unpaidTotal = unpaid.reduce(
+          (sum, row) => sum + (Number(row.price) || 0) * (Number(row.quantity) || 0),
+          0
+        );
+        setAccountsPayableAmount(unpaidTotal);
+        setAccountsPayablePending(unpaid.length);
+      } catch (error) {
+        if (error?.response?.status === 404) {
+          setAccountsPayableAmount(0);
+          setAccountsPayablePending(0);
+          return;
+        }
+        setAccountsPayableAmount(0);
+        setAccountsPayablePending(0);
+      }
+    };
+
+    fetchPayables();
+  }, []);
 
   // Calculate real metrics
   const today = new Date().toDateString();
@@ -614,8 +643,8 @@ const DashboardStats = () => {
     },
     {
       title: "Accounts Payable",
-      value: "$0.00",
-      change: "0 pending",
+      value: `$${accountsPayableAmount.toFixed(2)}`,
+      change: `${accountsPayablePending} pending`,
       icon: FileBarChart,
       color: "text-rose-600 bg-rose-50",
     },
