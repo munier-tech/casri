@@ -929,11 +929,15 @@ export const getAccountsReceivable = async (req, res) => {
       saleId: sale.id,
       saleNumber: sale.saleNumber,
       customer: sale.customerName || 'Walk-in Customer',
+      customerPhone: sale.customerPhone || null,
       total: sale.amountDue,
       paid: sale.amountPaid,
       balance: sale.remainingBalance,
       status: sale.status.toLowerCase(),
-      paymentMethod: sale.paymentMethod.toLowerCase()
+      paymentMethod: sale.paymentMethod.toLowerCase(),
+      dueDate: sale.dueDate,
+      createdAt: sale.createdAt,
+      notes: sale.notes || null
     }));
 
     res.status(200).json({

@@ -187,12 +187,39 @@ export const deleteVendor = async (req, res) => {
   try {
     const { id } = req.params;
 
-    await prisma.purchase.deleteMany({
-      where: { vendorId: id }
+    const vendor = await prisma.vendor.findUnique({
+      where: { id },
+      select: { id: true }
     });
 
-    const vendor = await prisma.vendor.delete({
-      where: { id }
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const purchases = await tx.purchase.findMany({
+        where: { vendorId: id },
+        select: { id: true }
+      });
+
+      const purchaseIds = purchases.map((p) => p.id);
+
+      if (purchaseIds.length > 0) {
+        await tx.purchaseProduct.deleteMany({
+          where: { purchaseId: { in: purchaseIds } }
+        });
+
+        await tx.purchase.deleteMany({
+          where: { id: { in: purchaseIds } }
+        });
+      }
+
+      await tx.vendor.delete({
+        where: { id }
+      });
     });
 
     res.status(200).json({

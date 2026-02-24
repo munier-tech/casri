@@ -13,27 +13,11 @@ import {
   FiCalendar,
   FiPackage,
   FiPrinter,
-  FiPercent,
-  FiSmartphone,
-  FiUser,
-  FiPhone,
-  FiChevronDown,
-  FiCreditCard,
-  FiCheckCircle,
-  FiClock,
-  FiAlertCircle,
-  FiSettings
+  FiPercent
 } from "react-icons/fi";
-import {
-  BsCashCoin,
-  BsPhone,
-  BsWallet2
-} from "react-icons/bs";
-import { MdPayment, MdReceipt } from "react-icons/md";
 import useProductsStore from "../store/useProductsStore";
 import useSalesStore from "../store/UseSalesStore";
 import useReceiptSettingsStore from "../store/useReceiptSettingsStore";
-import { DollarSign } from "lucide-react";
 
 // Memoized Product Row Component
 const ProductRow = React.memo(({ 
@@ -155,9 +139,7 @@ const CreateSaleNew = () => {
   const { fetchProducts } = useProductsStore();
   const {
     settings: receiptSettings,
-    fetchReceiptSettings,
-    saveReceiptSettings,
-    saving: savingReceiptSettings
+    fetchReceiptSettings
   } = useReceiptSettingsStore();
   const {
     searchProducts,
@@ -188,6 +170,7 @@ const CreateSaleNew = () => {
   const [paymentMethod, setPaymentMethod] = useState("");
   const [amountDue, setAmountDue] = useState("");
   const [amountPaid, setAmountPaid] = useState("");
+  const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Customer information
   const [customerName, setCustomerName] = useState("");
@@ -198,7 +181,6 @@ const CreateSaleNew = () => {
   const [discountType, setDiscountType] = useState("percentage");
   const [discountValue, setDiscountValue] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [showPaymentDropdown, setShowPaymentDropdown] = useState(false);
   const [receiptOption, setReceiptOption] = useState("print");
   const [settingsDraft, setSettingsDraft] = useState({
     storeName: "CASRI INVENTORY",
@@ -213,7 +195,6 @@ const CreateSaleNew = () => {
   const searchInputRef = useRef(null);
   const amountPaidInputRef = useRef(null);
   const searchResultsRef = useRef(null);
-  const paymentDropdownRef = useRef(null);
   const debounceTimerRef = useRef(null);
 
   // Memoized calculations
@@ -243,15 +224,6 @@ const CreateSaleNew = () => {
       changeAmount: paid > due ? paid - due : 0
     };
   }, [amountPaid, amountDue, grandTotal]);
-
-  // Memoized total expected
-  const totalExpected = useMemo(() => {
-    return selectedProducts.reduce((sum, product) => {
-      const discountAmount = (product.sellingPrice * product.discount) / 100;
-      const priceAfterDiscount = product.sellingPrice - discountAmount;
-      return sum + (priceAfterDiscount * product.quantity);
-    }, 0);
-  }, [selectedProducts]);
 
   // Fetch initial data
   useEffect(() => {
@@ -289,12 +261,18 @@ const CreateSaleNew = () => {
     }
   }, [saleType, salesLookupDate, fetchSalesByDate]);
 
-  // Set amount due automatically when grand total changes
+  // Keep amount due in sync with the latest cart total
   useEffect(() => {
-    if (grandTotal > 0 && !amountDue) {
-      setAmountDue(grandTotal.toFixed(2));
+    if (selectedProducts.length === 0) {
+      if (amountDue) setAmountDue("");
+      return;
     }
-  }, [grandTotal, amountDue]);
+
+    const nextAmountDue = grandTotal > 0 ? grandTotal.toFixed(2) : "";
+    if (amountDue !== nextAmountDue) {
+      setAmountDue(nextAmountDue);
+    }
+  }, [grandTotal, selectedProducts.length, amountDue]);
 
   // Search products with debounce
   useEffect(() => {
@@ -323,9 +301,6 @@ const CreateSaleNew = () => {
     const handleClickOutside = (event) => {
       if (searchResultsRef.current && !searchResultsRef.current.contains(event.target)) {
         setShowSearchResults(false);
-      }
-      if (paymentDropdownRef.current && !paymentDropdownRef.current.contains(event.target)) {
-        setShowPaymentDropdown(false);
       }
     };
 
@@ -379,18 +354,6 @@ const CreateSaleNew = () => {
     toast.error("No product found for this barcode");
   }, [searchResults, searchTerm, handleProductSelect, searchProducts]);
 
-  const saveReceiptSettingsChanges = useCallback(async () => {
-    try {
-      await saveReceiptSettings({
-        ...settingsDraft,
-        barcodeFontSize: Number(settingsDraft.barcodeFontSize) || 36,
-      });
-      toast.success("Receipt barcode settings saved");
-    } catch (error) {
-      toast.error(error.message || "Failed to save receipt settings");
-    }
-  }, [saveReceiptSettings, settingsDraft]);
-
   const handleQuantityChange = useCallback((productId, quantity) => {
     if (quantity >= 1) {
       updateProductQuantity(productId, quantity);
@@ -424,17 +387,20 @@ const CreateSaleNew = () => {
       return;
     }
 
-    if (!amountDue || parseFloat(amountDue) <= 0) {
+    const dueAmount = parseFloat(amountDue || grandTotal);
+    const paidAmountValue = parseFloat(amountPaid);
+
+    if (!Number.isFinite(dueAmount) || dueAmount <= 0) {
       toast.error("Amount due is required");
       return;
     }
 
-    if (!amountPaid || parseFloat(amountPaid) < 0) {
+    if (!Number.isFinite(paidAmountValue) || paidAmountValue < 0) {
       toast.error("Amount paid is required");
       return;
     }
 
-    if (parseFloat(amountPaid) > parseFloat(amountDue)) {
+    if (paidAmountValue > dueAmount) {
       toast.error("Amount paid cannot exceed amount due");
       return;
     }
@@ -449,10 +415,11 @@ const CreateSaleNew = () => {
       discountPercentage: discountType === "percentage" ? parseFloat(discountValue) || 0 : 0,
       discountAmount: discountType === "amount" ? parseFloat(discountValue) || 0 : 0,
       paymentMethod,
-      amountDue: parseFloat(amountDue),
-      amountPaid: parseFloat(amountPaid),
+      amountDue: dueAmount,
+      amountPaid: paidAmountValue,
       grandTotal: grandTotal,
       ...(saleType === "date" && { saleDate }),
+      ...(dueDate && { dueDate }),
       ...(customerName && { customerName }),
       ...(customerPhone && { customerPhone }),
       ...(notes && { notes })
@@ -465,7 +432,7 @@ const CreateSaleNew = () => {
       } else {
         await createSale(saleData);
 
-        if (parseFloat(amountPaid) >= parseFloat(amountDue)) {
+        if (paidAmountValue >= dueAmount) {
           toast.success("Sale completed successfully!");
         } else {
           toast.success("Sale recorded with partial payment!");
@@ -486,6 +453,7 @@ const CreateSaleNew = () => {
       setNotes("");
       setDiscountValue("");
       setSearchTerm("");
+      setDueDate(new Date().toISOString().split('T')[0]);
 
       // Fetch updated sales
       await fetchDailySales();
@@ -505,6 +473,7 @@ const CreateSaleNew = () => {
     grandTotal,
     saleType,
     saleDate,
+    dueDate,
     customerName,
     customerPhone,
     notes,
@@ -637,15 +606,10 @@ const CreateSaleNew = () => {
 
   // Payment methods
   const paymentMethods = useMemo(() => [
-    { value: "cash", label: "Cash", icon: <BsCashCoin className="h-4 w-4" />, color: "from-green-500 to-emerald-600" },
-    { value: "zaad", label: "Zaad", icon: <FiSmartphone className="h-4 w-4" />, color: "from-blue-500 to-indigo-600" },
-    { value: "edahab", label: "Edahab", icon: <DollarSign className="h-4 w-4" />, color: "from-purple-500 to-pink-600" }
+    { value: "cash", label: "Cash" },
+    { value: "zaad", label: "Zaad" },
+    { value: "edahab", label: "Edahab" }
   ], []);
-
-  const selectedPaymentMethod = useMemo(() => 
-    paymentMethods.find(method => method.value === paymentMethod), 
-    [paymentMethods, paymentMethod]
-  );
 
   const getStockStatusColor = useCallback((stock, threshold = 5) => {
     if (stock === 0) return "bg-red-100 text-red-800 border-red-200";
@@ -654,8 +618,8 @@ const CreateSaleNew = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 p-4 md:p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 p-2 md:p-3">
+      <div className="w-full">
 
         {/* Header with Glassmorphism */}
         <motion.div 
@@ -930,429 +894,174 @@ const CreateSaleNew = () => {
           </div>
 
           {/* Right Column - Checkout Section */}
-          <div className="space-y-6">
-
-            {/* Customer Information Card with Modern Design */}
-            <motion.div 
+          <div className="lg:col-span-1">
+            <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="bg-white rounded-2xl border border-gray-200/60 p-6 shadow-sm hover:shadow-md transition-shadow"
+              className="bg-white rounded-2xl border border-gray-200/60 p-5 shadow-sm space-y-4 lg:sticky lg:top-6"
             >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-10 w-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
-                  <FiUser className="h-5 w-5 text-white" />
+              <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Total:</span>
+                  <span className="font-semibold text-gray-900">${calculations.subtotal.toFixed(2)}</span>
                 </div>
-                <h2 className="text-lg font-semibold text-gray-800">Customer Information</h2>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Discount:</span>
+                  <span className="font-semibold text-red-600">-${discountAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between text-base pt-2 border-t border-gray-200">
+                  <span className="font-medium text-gray-700">Expected:</span>
+                  <span className="font-bold text-blue-600">${grandTotal.toFixed(2)}</span>
+                </div>
               </div>
 
-              <div className="space-y-6">
-                {/* Total and Discount Section */}
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-xl p-4 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Subtotal:</span>
-                    <span className="text-2xl font-bold text-gray-900">${calculations.subtotal.toFixed(2)}</span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Discount:</span>
-                    <span className="text-xl font-semibold text-red-500">-${discountAmount.toFixed(2)}</span>
-                  </div>
+              <div>
+                <label className="block text-sm text-gray-700 mb-1.5 font-medium">Discount</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={discountValue}
+                    onChange={(e) => setDiscountValue(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                    placeholder={discountType === "percentage" ? "0" : "0.00"}
+                    min="0"
+                    max={discountType === "percentage" ? "100" : calculations.subtotal}
+                    step={discountType === "percentage" ? "1" : "0.01"}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setDiscountType(discountType === "percentage" ? "amount" : "percentage")}
+                    className="px-3 py-2.5 border border-gray-300 rounded-lg text-sm font-medium bg-white hover:bg-gray-50"
+                  >
+                    {discountType === "percentage" ? "%" : "$"}
+                  </button>
+                </div>
+              </div>
 
-                  <div className="pt-3 border-t border-gray-200">
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        {discountType === "percentage" ? (
-                          <FiPercent className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                        ) : (
-                          <FiDollarSign className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                        )}
-                        <input
-                          type="number"
-                          value={discountValue}
-                          onChange={(e) => setDiscountValue(e.target.value)}
-                          className="w-full pl-9 pr-4 py-2 border-2 border-gray-200 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                          placeholder={discountType === "percentage" ? "0" : "0.00"}
-                          min="0"
-                          max={discountType === "percentage" ? "100" : calculations.subtotal}
-                          step={discountType === "percentage" ? "1" : "0.01"}
-                        />
-                      </div>
-                      <button
-                        onClick={() => setDiscountType(discountType === "percentage" ? "amount" : "percentage")}
-                        className="px-4 py-2 border-2 border-gray-200 rounded-xl text-sm font-medium bg-white hover:bg-gray-50 transition-colors"
-                      >
-                        {discountType === "percentage" ? "%" : "$"}
-                      </button>
-                    </div>
-                  </div>
+              {saleType === "date" && (
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1.5 font-medium">Sale date</label>
+                  <input
+                    type="date"
+                    value={saleDate}
+                    onChange={(e) => setSaleDate(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                  />
+                </div>
+              )}
 
-                  <div className="flex justify-between items-center pt-2">
-                    <span className="text-gray-800 font-semibold">Grand Total:</span>
-                    <span className="text-2xl font-bold text-green-600">${grandTotal.toFixed(2)}</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1.5 font-medium">Payment method</label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                  >
+                    <option value="">Select Option</option>
+                    {paymentMethods.map((method) => (
+                      <option key={method.value} value={method.value}>
+                        {method.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1.5 font-medium">Amount paid</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-gray-500">$</span>
+                    <input
+                      ref={amountPaidInputRef}
+                      type="number"
+                      value={amountPaid}
+                      onChange={(e) => setAmountPaid(e.target.value)}
+                      className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                    />
                   </div>
                 </div>
 
-                {/* Payment Section */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Payment Details</h3>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1.5 font-medium">Receipt option</label>
+                  <select
+                    value={receiptOption}
+                    onChange={(e) => setReceiptOption(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                  >
+                    <option value="">Select Option</option>
+                    <option value="print">Print Receipt</option>
+                    <option value="email">Email Receipt</option>
+                    <option value="none">No Receipt</option>
+                  </select>
+                </div>
 
-                  {saleType === "date" && (
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-1.5 font-medium">Sale Date</label>
-                      <div className="relative">
-                        <FiCalendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <input
-                          type="date"
-                          value={saleDate}
-                          onChange={(e) => setSaleDate(e.target.value)}
-                          className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm bg-white focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                        />
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Amount paid */}
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1.5 font-medium">Amount Paid</label>
-                    <div className="relative">
-                      <FiDollarSign className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <input
-                        ref={amountPaidInputRef}
-                        type="number"
-                        value={amountPaid}
-                        onChange={(e) => setAmountPaid(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                        placeholder="0.00"
-                        min="0"
-                        step="0.01"
-                      />
-                    </div>
-                  </div>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1.5 font-medium">Due date</label>
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                  />
+                </div>
 
-                  {/* Payment Method Dropdown */}
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1.5 font-medium">Payment Method</label>
-                    <div className="relative" ref={paymentDropdownRef}>
-                      <button
-                        onClick={() => setShowPaymentDropdown(!showPaymentDropdown)}
-                        className="w-full p-3 border-2 border-gray-200 rounded-xl text-sm text-left flex items-center justify-between bg-white hover:border-blue-500 transition-colors"
-                      >
-                        <div className="flex items-center">
-                          {selectedPaymentMethod ? (
-                            <>
-                              <div className={`h-8 w-8 bg-gradient-to-br ${selectedPaymentMethod.color} rounded-lg flex items-center justify-center mr-3`}>
-                                {selectedPaymentMethod.icon}
-                              </div>
-                              <span className="font-medium">{selectedPaymentMethod.label}</span>
-                            </>
-                          ) : (
-                            <>
-                              <div className="h-8 w-8 bg-gradient-to-br from-gray-200 to-gray-300 rounded-lg flex items-center justify-center mr-3">
-                                <MdPayment className="h-4 w-4 text-gray-600" />
-                              </div>
-                              <span className="text-gray-400">Select payment method</span>
-                            </>
-                          )}
-                        </div>
-                        <FiChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${showPaymentDropdown ? 'rotate-180' : ''}`} />
-                      </button>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1.5 font-medium">Customer name (optional)</label>
+                  <input
+                    type="text"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                    placeholder="Customer name"
+                  />
+                </div>
 
-                      {/* Dropdown menu */}
-                      <AnimatePresence>
-                        {showPaymentDropdown && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                            className="absolute z-10 mt-2 w-full bg-white border-2 border-gray-100 rounded-xl shadow-xl overflow-hidden"
-                          >
-                            {paymentMethods.map((method) => (
-                              <button
-                                key={method.value}
-                                onClick={() => {
-                                  setPaymentMethod(method.value);
-                                  setShowPaymentDropdown(false);
-                                }}
-                                className="w-full p-3 text-left flex items-center hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 border-b border-gray-100 last:border-b-0 transition-colors"
-                              >
-                                <div className={`h-8 w-8 bg-gradient-to-br ${method.color} rounded-lg flex items-center justify-center mr-3`}>
-                                  {method.icon}
-                                </div>
-                                <span className="font-medium">{method.label}</span>
-                              </button>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </div>
-
-                  {/* Receipt option */}
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1.5 font-medium">Receipt Option</label>
-                    <select
-                      value={receiptOption}
-                      onChange={(e) => setReceiptOption(e.target.value)}
-                      className="w-full p-3 border-2 border-gray-200 rounded-xl text-sm bg-white focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                    >
-                      <option value="">Select receipt option</option>
-                      <option value="print">🖨️ Print Receipt</option>
-                      <option value="email">📧 Email Receipt</option>
-                      <option value="none">❌ No Receipt</option>
-                    </select>
-                  </div>
-
-                  <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/70">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <FiSettings className="h-4 w-4" />
-                        Barcode Print Settings
-                      </h4>
-                      <button
-                        type="button"
-                        onClick={saveReceiptSettingsChanges}
-                        disabled={savingReceiptSettings}
-                        className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-                      >
-                        {savingReceiptSettings ? "Saving..." : "Save"}
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                      <input
-                        type="text"
-                        value={settingsDraft.storeName}
-                        onChange={(e) => setSettingsDraft((prev) => ({ ...prev, storeName: e.target.value }))}
-                        placeholder="Store name"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      />
-                      <input
-                        type="text"
-                        value={settingsDraft.footerMessage}
-                        onChange={(e) => setSettingsDraft((prev) => ({ ...prev, footerMessage: e.target.value }))}
-                        placeholder="Footer message"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      />
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-gray-600">Barcode wrapper</label>
-                        <input
-                          type="text"
-                          value={settingsDraft.barcodeWrapper}
-                          onChange={(e) => setSettingsDraft((prev) => ({ ...prev, barcodeWrapper: e.target.value.slice(0, 2) }))}
-                          className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg text-sm"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-gray-600">Barcode font</label>
-                        <input
-                          type="number"
-                          min="18"
-                          max="72"
-                          value={settingsDraft.barcodeFontSize}
-                          onChange={(e) => setSettingsDraft((prev) => ({ ...prev, barcodeFontSize: e.target.value }))}
-                          className="w-24 px-2 py-1.5 border border-gray-300 rounded-lg text-sm"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-4 mb-3">
-                      <label className="flex items-center gap-2 text-xs text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={settingsDraft.includeItemBarcode}
-                          onChange={(e) => setSettingsDraft((prev) => ({ ...prev, includeItemBarcode: e.target.checked }))}
-                        />
-                        Show item barcode
-                      </label>
-                      <label className="flex items-center gap-2 text-xs text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={settingsDraft.showSaleBarcode}
-                          onChange={(e) => setSettingsDraft((prev) => ({ ...prev, showSaleBarcode: e.target.checked }))}
-                        />
-                        Show sale barcode
-                      </label>
-                    </div>
-
-                    <div className="rounded-lg border border-dashed border-gray-300 bg-white p-3">
-                      <p className="text-xs text-gray-500 mb-1">Barcode preview</p>
-                      <p
-                        className="text-center text-gray-900 leading-none"
-                        style={{
-                          fontSize: `${Number(settingsDraft.barcodeFontSize) || 36}px`,
-                          fontFamily: "'Libre Barcode 39 Text', monospace"
-                        }}
-                      >
-                        {(settingsDraft.barcodeWrapper || "*")}12345678{(settingsDraft.barcodeWrapper || "*")}
-                      </p>
-                      <p className="text-center text-xs text-gray-500 mt-1">12345678</p>
-                    </div>
-                  </div>
-
-                  {/* Due date */}
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1.5 font-medium">Due Date</label>
-                    <div className="relative">
-                      <FiCalendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <input
-                        type="date"
-                        className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm bg-white focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                        defaultValue={new Date().toISOString().split('T')[0]}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Customer name */}
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1.5 font-medium">Customer Name (Optional)</label>
-                    <div className="relative">
-                      <FiUser className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                        placeholder="Enter customer name"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Customer phone */}
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1.5 font-medium">Customer Phone</label>
-                    <div className="flex">
-                      <div className="w-20 p-3 border-2 border-r-0 border-gray-200 rounded-l-xl text-sm bg-gradient-to-r from-gray-50 to-gray-100 font-medium flex items-center justify-center">
-                        +252
-                      </div>
-                      <div className="relative flex-1">
-                        <FiPhone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <input
-                          type="text"
-                          value={customerPhone}
-                          onChange={(e) => setCustomerPhone(e.target.value)}
-                          className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-r-xl text-sm focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                          placeholder="61xxxxxx"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1.5 font-medium">Notes</label>
-                    <textarea
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      className="w-full p-3 border-2 border-gray-200 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                      placeholder="Add notes or description..."
-                      rows="3"
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1.5 font-medium">Customer phone</label>
+                  <div className="flex">
+                    <span className="px-3 py-2.5 border border-r-0 border-gray-300 rounded-l-lg text-sm text-gray-700 bg-gray-50">+252</span>
+                    <input
+                      type="text"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-r-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                      placeholder="63xxxxxx"
                     />
                   </div>
                 </div>
               </div>
-            </motion.div>
 
-            {/* Summary Card with Payment Status */}
-            <motion.div 
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 }}
-              className="bg-white rounded-2xl border border-gray-200/60 p-6 shadow-sm hover:shadow-md transition-shadow"
-            >
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <BsWallet2 className="h-5 w-5 text-indigo-600" />
-                Payment Summary
-              </h3>
-
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Items:</span>
-                  <span className="font-medium bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                    {selectedProducts.length}
-                  </span>
-                </div>
-
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Total Quantity:</span>
-                  <span className="font-medium">{selectedProducts.reduce((sum, p) => sum + p.quantity, 0)}</span>
-                </div>
-
-                <div className="pt-3 border-t border-gray-200">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-800 font-semibold">Grand Total:</span>
-                    <span className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                      ${grandTotal.toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-
-                {remainingBalance > 0 && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex justify-between items-center p-3 bg-amber-50 rounded-xl border border-amber-200"
-                  >
-                    <span className="text-amber-700 font-medium flex items-center gap-1">
-                      <FiAlertCircle className="h-4 w-4" />
-                      Balance Due:
-                    </span>
-                    <span className="text-xl font-bold text-amber-600">${remainingBalance.toFixed(2)}</span>
-                  </motion.div>
-                )}
-
-                {changeAmount > 0 && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex justify-between items-center p-3 bg-green-50 rounded-xl border border-green-200"
-                  >
-                    <span className="text-green-700 font-medium flex items-center gap-1">
-                      <FiCheckCircle className="h-4 w-4" />
-                      Change:
-                    </span>
-                    <span className="text-xl font-bold text-green-600">${changeAmount.toFixed(2)}</span>
-                  </motion.div>
-                )}
-
-                {/* Checkout Button - Single Button */}
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleCheckout}
-                  disabled={loading || selectedProducts.length === 0 || !paymentMethod || !amountDue || !amountPaid}
-                  className="w-full mt-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <FiCheckCircle className="h-5 w-5" />
-                      {saleType === "date" ? "Create Sale By Date" : "Checkout"}
-                    </>
-                  )}
-                </motion.button>
-
-                {/* Payment Status Indicator */}
-                {selectedProducts.length > 0 && paymentMethod && (
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="mt-4 p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl text-center"
-                  >
-                    <p className="text-xs text-gray-600 flex items-center justify-center gap-2">
-                      <FiClock className="h-3 w-3" />
-                      {parseFloat(amountPaid) >= parseFloat(amountDue) ? (
-                        <span className="text-green-600 font-medium">✓ Fully Paid - Ready to checkout</span>
-                      ) : (
-                        <span className="text-amber-600 font-medium">⚠ Partial Payment - Balance due: ${remainingBalance.toFixed(2)}</span>
-                      )}
-                    </p>
-                  </motion.div>
-                )}
+              <div>
+                <label className="block text-sm text-gray-700 mb-1.5 font-medium">Description</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows="3"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                  placeholder="Add any notes or description..."
+                />
               </div>
+
+              {selectedProducts.length > 0 && paymentMethod && (
+                <p className="text-xs text-center text-gray-600">
+                  {parseFloat(amountPaid || 0) >= parseFloat(amountDue || grandTotal || 0)
+                    ? "Fully paid, ready to checkout"
+                    : `Balance due: $${remainingBalance.toFixed(2)}`}
+                </p>
+              )}
+
+              <motion.button
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                onClick={handleCheckout}
+                disabled={loading || selectedProducts.length === 0 || !paymentMethod || grandTotal <= 0 || !amountPaid}
+                className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base shadow-sm"
+              >
+                {loading ? "Processing..." : saleType === "date" ? "Create Sale By Date" : "Checkout Now"}
+              </motion.button>
             </motion.div>
           </div>
         </div>
@@ -1362,3 +1071,4 @@ const CreateSaleNew = () => {
 };
 
 export default CreateSaleNew;
+

@@ -19,6 +19,7 @@ import {
   DollarSign,
   User,
   ChevronDown,
+  Settings,
   Menu,
   X,
   Bell,
@@ -71,6 +72,7 @@ const Dashboard = ({ activeTab: initialActiveTab }) => {
     else if (path.includes("/loans")) setActiveTab("loans");
     else if (path.includes("/purchases")) setActiveTab("purchases");
     else if (path.includes("/payment-methods")) setActiveTab("payment-methods");
+    else if (path.includes("/receipt-customization")) setActiveTab("receipt-customization");
   }, [location]);
 
   useEffect(() => {
@@ -166,6 +168,14 @@ const Dashboard = ({ activeTab: initialActiveTab }) => {
       path: "/GetSales",
       desc: "View today's sales report",
     },
+    {
+      id: "receipt-customization",
+      label: "Receipt Settings",
+      icon: Settings,
+      color: "from-slate-500 to-slate-600",
+      gradient: "bg-gradient-to-r from-slate-500 to-slate-600",
+      path: "/receipt-customization",
+    },
   ];
 
   const quickAccessCards = [
@@ -207,7 +217,7 @@ const Dashboard = ({ activeTab: initialActiveTab }) => {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-gray-900">
       {/* Top Navigation Bar */}
       <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-gray-200 shadow-sm">
-        <div className="container mx-auto px-4 py-3">
+        <div className="w-full px-2 md:px-3 py-3">
           <div className="flex items-center justify-between">
             {/* Logo and Brand */}
             <div className="flex items-center gap-4">
@@ -391,7 +401,7 @@ const Dashboard = ({ activeTab: initialActiveTab }) => {
       </nav>
 
       {/* Main Content Area */}
-      <div className="container mx-auto px-4 py-8">
+      <div className="w-full px-2 md:px-3 py-8">
         {/* Show Dashboard Content Only on Dashboard Page */}
         {location.pathname === "/dashboard" || location.pathname === "/" ? (
           <>

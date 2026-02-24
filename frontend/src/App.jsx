@@ -26,6 +26,7 @@ import GetSales from './components/sales/getSales';
 import Vendor from './components/vendors/Vendor';
 import ExpensesPage from './components/expenses/ExpensesForm';
 import Account from './components/AccountReceivables/Account';
+import ReceiptCustomization from './components/settings/ReceiptCustomization';
 
 const App = () => {
   const { checkAuth, user, isLoading, authChecked } = useUserStore();
@@ -92,6 +93,7 @@ const App = () => {
           <Route path="Account" element={<Account />} />
           <Route path="loans" element={<LoanManagement />} />
           <Route path="FinancialLogDate" element={<FinancialLogDate />} />
+          <Route path="receipt-customization" element={<ReceiptCustomization />} />
 
           {/* Catch-all for dashboard routes */}
           <Route path="*" element={<NotFound />} />
@@ -122,6 +124,7 @@ const DashboardLayout = () => {
     if (path.includes('/loans')) return 'loans';
     if (path.includes('/purchases')) return 'purchases';
     if (path.includes('/categories')) return 'categories';
+    if (path.includes('/receipt-customization')) return 'receipt-customization';
     return 'dashboard';
   };
 
