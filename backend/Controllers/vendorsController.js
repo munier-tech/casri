@@ -454,17 +454,36 @@ export const getVendorPurchases = async (req, res) => {
       orderBy: { datePurchased: 'desc' }
     });
 
-    const mappedPurchases = purchases.flatMap(purchase => 
-      purchase.purchaseProducts.map(product => ({
-        id: purchase.id,
-        vendorId: purchase.vendorId,
-        vendorName: purchase.supplierName,
+    const mappedPurchases = purchases.map((purchase) => {
+      const products = (purchase.purchaseProducts || []).map((product) => ({
         productId: product.productId,
         productName: product.productName,
         product: product.product,
         quantity: product.quantity,
         unitPrice: product.unitPrice,
-        total: product.total,
+        total: product.total
+      }));
+
+      const hasProducts = products.length > 0;
+      const totalQuantity = hasProducts
+        ? products.reduce((sum, product) => sum + (parseInt(product.quantity) || 0), 0)
+        : (purchase.quantity || 0);
+
+      const displayProductName = hasProducts
+        ? (products.length === 1
+            ? products[0].productName
+            : `${products[0].productName} +${products.length - 1} more`)
+        : (purchase.productName || 'Purchase Order');
+
+      return {
+        id: purchase.id,
+        vendorId: purchase.vendorId,
+        vendorName: purchase.supplierName,
+        productName: displayProductName,
+        quantity: totalQuantity,
+        unitPrice: hasProducts ? (products[0].unitPrice || 0) : (purchase.price || 0),
+        total: purchase.total || purchase.amountDue || 0,
+        products,
         amountDue: purchase.amountDue || 0,
         amountPaid: purchase.amountPaid || 0,
         paymentMethod: purchase.paymentMethod || 'cash',
@@ -472,8 +491,8 @@ export const getVendorPurchases = async (req, res) => {
         purchaseDate: purchase.datePurchased,
         createdAt: purchase.datePurchased,
         updatedAt: purchase.updatedAt
-      }))
-    );
+      };
+    });
 
     res.status(200).json({
       success: true,
@@ -580,6 +599,10 @@ export const deletePurchase = async (req, res) => {
           totalAmount: { decrement: purchase.amountDue || 0 },
           balance: { decrement: balanceChange || 0 }
         }
+      });
+
+      await tx.purchaseProduct.deleteMany({
+        where: { purchaseId }
       });
 
       await tx.purchase.delete({ where: { id: purchaseId } });

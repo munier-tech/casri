@@ -243,8 +243,12 @@ const PurchaseManager = () => {
 
   const handleDelete = async (id) => {
     if (window.confirm("Ma hubtaa inaad rabto inaad tirtirto iibkan?")) {
-      await deletePurchase(id);
-      await getAllPurchases();
+      const result = await deletePurchase(id);
+      if (result?.success) {
+        setSuccessMessage("✅ Iibsashada si guul leh ayaa loo tirtiray.");
+        await getAllPurchases();
+        setTimeout(() => setSuccessMessage(""), 3000);
+      }
     }
   };
 

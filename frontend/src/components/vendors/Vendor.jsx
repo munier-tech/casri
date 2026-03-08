@@ -27,6 +27,23 @@ import {
 import { toast } from 'react-hot-toast';
 import axiosInstance from '../../lib/axios';
 
+const getPurchaseProducts = (purchase) => {
+  if (Array.isArray(purchase?.products) && purchase.products.length > 0) {
+    return purchase.products;
+  }
+
+  if (purchase?.productName) {
+    return [{
+      productName: purchase.productName,
+      quantity: purchase.quantity || 0,
+      unitPrice: purchase.unitPrice || 0,
+      total: purchase.total || purchase.amountDue || 0
+    }];
+  }
+
+  return [];
+};
+
 // ========== CREATE VENDOR MODAL ==========
 const CreateVendorModal = ({ isOpen, onClose, onCreate }) => {
   const [formData, setFormData] = useState({
@@ -1244,6 +1261,7 @@ const ViewPurchaseModal = ({ isOpen, onClose, purchase }) => {
   if (!isOpen || !purchase) return null;
 
   const balance = (purchase.amountDue || 0) - (purchase.amountPaid || 0);
+  const products = getPurchaseProducts(purchase);
 
   return (
     <div 
@@ -1317,23 +1335,27 @@ const ViewPurchaseModal = ({ isOpen, onClose, purchase }) => {
                 <Package className="w-4 h-4" />
                 Product Details
               </h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-sm text-gray-500">Product</p>
-                  <p className="font-medium text-gray-900">{purchase.productName}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Quantity</p>
-                  <p className="font-medium text-gray-900">{purchase.quantity}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Unit Price</p>
-                  <p className="font-medium text-gray-900">${purchase.unitPrice?.toFixed(2)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Total</p>
-                  <p className="font-medium text-gray-900">${purchase.amountDue?.toFixed(2)}</p>
-                </div>
+              <div className="space-y-2">
+                {products.map((product, index) => (
+                  <div key={`${product.productId || product.productName}_${index}`} className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white p-3 rounded-lg border border-gray-200">
+                    <div>
+                      <p className="text-sm text-gray-500">Product</p>
+                      <p className="font-medium text-gray-900">{product.productName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Quantity</p>
+                      <p className="font-medium text-gray-900">{product.quantity}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Unit Price</p>
+                      <p className="font-medium text-gray-900">${(product.unitPrice || 0).toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Line Total</p>
+                      <p className="font-medium text-gray-900">${(product.total || 0).toFixed(2)}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -1409,6 +1431,7 @@ const Vendor = () => {
     createVendor,
     updateVendor,
     deleteVendor,
+    deletePurchase,
     createPurchase,
     fetchAllPurchases,
     setActiveTab,
@@ -1472,6 +1495,14 @@ const Vendor = () => {
 
   const handleDownloadReceipt = (purchase, e) => {
     e?.stopPropagation();
+    const products = getPurchaseProducts(purchase);
+    const productsText = products
+      .map((product, index) => (
+        `      ${index + 1}. ${product.productName}\n` +
+        `         Qty: ${product.quantity} | Unit Price: $${(product.unitPrice || 0).toFixed(2)} | Line Total: $${(product.total || 0).toFixed(2)}`
+      ))
+      .join('\n');
+
     // Generate receipt content
     const receiptContent = `
       =================================
@@ -1488,9 +1519,7 @@ const Vendor = () => {
       
       PRODUCT INFORMATION
       -------------------
-      Product: ${purchase.productName}
-      Quantity: ${purchase.quantity}
-      Unit Price: $${purchase.unitPrice?.toFixed(2)}
+${productsText}
       
       PAYMENT INFORMATION
       -------------------
@@ -1518,6 +1547,31 @@ const Vendor = () => {
     URL.revokeObjectURL(url);
     
     toast.success('Receipt downloaded');
+  };
+
+  const handleDeletePurchase = async (purchase, e) => {
+    e?.stopPropagation();
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete purchase #${purchase.id?.slice(-8)}?`
+    );
+
+    if (!confirmed) return;
+
+    const result = await deletePurchase(purchase.vendorId, purchase.id);
+    if (result?.success) {
+      toast.success('Purchase deleted successfully');
+      if (selectedPurchaseForView?.id === purchase.id) {
+        handleCloseViewModal();
+      }
+      if (selectedPurchaseForPay?.id === purchase.id) {
+        handleClosePayModal();
+      }
+      fetchAllPurchases();
+      fetchVendors();
+    } else {
+      toast.error(result?.error || 'Failed to delete purchase');
+    }
   };
 
   const handleAddVendor = (e) => {
@@ -1835,7 +1889,9 @@ const Vendor = () => {
                             <div className="text-sm">
                               <span className="font-medium text-gray-900">{purchase.productName}</span>
                               <div className="text-xs text-gray-500 mt-1">
-                                Qty: {purchase.quantity} × ${purchase.unitPrice?.toFixed(2)}
+                                {Array.isArray(purchase.products) && purchase.products.length > 1
+                                  ? `${purchase.products.length} products`
+                                  : `Qty: ${purchase.quantity} × $${purchase.unitPrice?.toFixed(2)}`}
                               </div>
                             </div>
                           </td>
@@ -1904,6 +1960,16 @@ const Vendor = () => {
                                 type="button"
                               >
                                 <Download className="w-4 h-4" />
+                              </motion.button>
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={(e) => handleDeletePurchase(purchase, e)}
+                                className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                title="Delete Purchase"
+                                type="button"
+                              >
+                                <Trash2 className="w-4 h-4" />
                               </motion.button>
                             </div>
                           </td>

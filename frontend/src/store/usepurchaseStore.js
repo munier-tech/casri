@@ -103,16 +103,24 @@ const usePurchaseStore = create((set, get) => ({
   deletePurchase: async (id) => {
     try {
       set({ loading: true, error: null });
-      await axios.delete(`/purchases/${id}`);
+      const res = await axios.delete(`/purchases/${id}`);
       set((state) => ({
         purchases: state.purchases.filter((p) => p.id !== id),
         loading: false,
       }));
+      return {
+        success: true,
+        data: res.data?.data || { id }
+      };
     } catch (err) {
       set({
         loading: false,
         error: err.response?.data?.message || err.message,
       });
+      return {
+        success: false,
+        error: err.response?.data?.message || err.message
+      };
     }
   },
 }));

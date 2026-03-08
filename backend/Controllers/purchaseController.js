@@ -218,10 +218,23 @@ export const deletePurchase = async (req, res) => {
       return res.status(403).json({ message: "You are not authorized to delete this purchase." });
     }
 
-    // Prisma transactional delete is better
-    await prisma.purchase.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      await tx.purchaseProduct.deleteMany({
+        where: { purchaseId: id }
+      });
 
-    res.status(200).json({ message: "Purchase deleted successfully.", purchase });
+      await tx.purchase.delete({ where: { id } });
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Purchase deleted successfully.",
+      data: {
+        id: purchase.id,
+        productName: purchase.productName,
+        supplierName: purchase.supplierName
+      }
+    });
   } catch (error) {
     console.error("Error in deletePurchase:", error);
     res.status(500).json({ message: error.message });
