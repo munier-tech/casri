@@ -1,0 +1,51 @@
+model Purchase {
+  id                String            @id @default(cuid())
+  supplierName      String
+  total             Float
+  amountDue         Float?            @default(0)
+  amountPaid        Float?            @default(0)
+  paymentMethod     String?           @default("cash")
+  notes             String?           @default("")
+  datePurchased     DateTime          @default(now())
+  productName       String?           @default("")
+  
+  user              User              @relation(fields: [userId], references: [id])
+  userId            String
+
+  vendor            Vendor?           @relation(fields: [vendorId], references: [id])
+  vendorId          String?
+
+  products          PurchaseProduct[]
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+}
+
+model PurchaseProduct {
+  id          String   @id @default(cuid())
+  purchase    Purchase @relation(fields: [purchaseId], references: [id])
+  purchaseId  String
+  product     Product? @relation(fields: [productId], references: [id])
+  productId   String?
+  productName String
+  quantity    Int
+  unitPrice   Float
+  total       Float
+}
+
+
+
+model Vendor {
+  id            String     @id @default(cuid())
+  name          String
+  phoneNumber   String
+  location      String
+  purchases     Purchase[]
+  totalPurchases Float      @default(0)
+  totalAmount   Float       @default(0)
+  balance       Float       @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+// model Sale {
