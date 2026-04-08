@@ -47,6 +47,373 @@ import { useUserStore } from "../store/useUserStore";
 import axios from "../lib/axios";
 import { BsCart } from "react-icons/bs";
 
+export const PaymentMethodsStats = () => {
+  const [selectedPeriod, setSelectedPeriod] = useState('today');
+  const [selectedMethod, setSelectedMethod] = useState(null);
+
+  const {
+    paymentMethodsStats,
+    fetchPaymentMethodsStats,
+    loading,
+    fetchPaymentMethodTransactions,
+    paymentMethodTransactions
+  } = useSalesStore();
+
+  useEffect(() => {
+    fetchPaymentMethodsStats();
+  }, []);
+
+  useEffect(() => {
+    if (selectedMethod) {
+      fetchPaymentMethodTransactions(selectedMethod, selectedPeriod);
+    }
+  }, [selectedMethod, selectedPeriod, fetchPaymentMethodTransactions]);
+
+  const handleMethodClick = (method) => {
+    setSelectedMethod(method);
+  };
+
+  const handleViewAll = () => {
+    setSelectedMethod(null);
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount || 0);
+  };
+
+  const getMethodIcon = (method) => {
+    switch (method) {
+      case 'cash': return Wallet;
+      case 'zaad': return Smartphone;
+      case 'edahab': return CreditCard;
+      case 'credit': return DollarSign;
+      default: return Wallet;
+    }
+  };
+
+  const getMethodColor = (method) => {
+    switch (method) {
+      case 'cash': return "from-blue-900 to-green-600";
+      case 'zaad': return "from-blue-500 to-blue-600";
+      case 'edahab': return "from-purple-500 to-purple-600";
+      case 'credit': return "from-amber-500 to-amber-600";
+      default: return "from-gray-500 to-gray-600";
+    }
+  };
+
+  const getMethodName = (method) => {
+    switch (method) {
+      case 'cash': return "Cash";
+      case 'zaad': return "Zaad";
+      case 'edahab': return "E-Dahab";
+      case 'credit': return "Credit";
+      default: return method;
+    }
+  };
+
+  if (loading && !paymentMethodsStats) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <RefreshCw className="animate-spin text-blue-600" size={32} />
+      </div>
+    );
+  }
+
+  const stats = paymentMethodsStats?.[selectedPeriod] || {};
+  const periods = ['today', 'weekly', 'monthly'];
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h3 className="text-2xl font-bold text-gray-900">
+            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Payment Methods
+            </span>
+          </h3>
+          <p className="text-gray-600 mt-1">Track sales by payment method</p>
+        </div>
+
+        {/* Period Selector */}
+        <div className="flex items-center gap-2">
+          <Calendar className="text-gray-400" size={20} />
+          <div className="flex bg-gray-100 rounded-lg p-1">
+            {periods.map((period) => (
+              <button
+                key={period}
+                onClick={() => setSelectedPeriod(period)}
+                className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-all ${selectedPeriod === period
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                  }`}
+              >
+                {period}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Payment Methods Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {Object.entries(stats).map(([method, data]) => {
+          const MethodIcon = getMethodIcon(method);
+          const totalPaid = data.totalAmountPaid || 0;
+          const totalSales = data.totalSales || 0;
+          const count = data.count || 0;
+
+          return (
+            <motion.div
+              key={method}
+              className={`bg-white rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer ${selectedMethod === method ? 'ring-2 ring-blue-500' : ''}`}
+              whileHover={{ y: -4 }}
+              onClick={() => handleMethodClick(method)}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className={`p-3 rounded-xl bg-gradient-to-r ${getMethodColor(method)}`}>
+                    <MethodIcon size={24} className="text-white" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold bg-gray-100 text-gray-700 px-3 py-1 rounded-full">
+                      {count} sales
+                    </span>
+                    <Eye className="text-gray-400" size={16} />
+                  </div>
+                </div>
+
+                <h4 className="text-lg font-bold text-gray-900 mb-2">
+                  {getMethodName(method)}
+                </h4>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Total Paid:</span>
+                    <span className="font-bold text-emerald-600">
+                      {formatCurrency(totalPaid)}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Total Sales:</span>
+                    <span className="font-bold text-blue-600">
+                      {formatCurrency(totalSales)}
+                    </span>
+                  </div>
+
+                  {data.totalRemainingBalance > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Balance Due:</span>
+                      <span className="font-bold text-amber-600">
+                        {formatCurrency(data.totalRemainingBalance)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className={`h-2 bg-gradient-to-r ${getMethodColor(method)}`}></div>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {/* Selected Method Transactions */}
+      {selectedMethod && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6"
+        >
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h4 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <span className={`p-2 rounded-lg bg-gradient-to-r ${getMethodColor(selectedMethod)}`}>
+                  {(() => {
+                    const Icon = getMethodIcon(selectedMethod);
+                    return <Icon className="text-white" size={20} />;
+                  })()}
+                </span>
+                {getMethodName(selectedMethod)} Transactions
+                <span className="text-sm font-normal text-gray-500 capitalize">
+                  ({selectedPeriod})
+                </span>
+              </h4>
+              <p className="text-gray-600 text-sm mt-1">
+                Showing all sales processed via {getMethodName(selectedMethod)}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleViewAll}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                View All Methods
+              </button>
+
+              <select
+                value={selectedPeriod}
+                onChange={(e) => setSelectedPeriod(e.target.value)}
+                className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="today">Today</option>
+                <option value="weekly">Last 7 Days</option>
+                <option value="monthly">This Month</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Transactions Table */}
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Sale Number
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date & Time
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Customer
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Amount Due
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Amount Paid
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Balance
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {paymentMethodTransactions.map((transaction) => (
+                  <tr key={transaction.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm font-medium text-blue-600">
+                        {transaction.saleNumber}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {new Date(transaction.createdAt).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {new Date(transaction.createdAt).toLocaleTimeString('en-US', {
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          hour12: true
+                        })}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-900">
+                        {transaction.customerName || 'Walk-in Customer'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm font-medium text-gray-900">
+                        {formatCurrency(transaction.amountDue)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm font-medium text-emerald-600">
+                        {formatCurrency(transaction.amountPaid)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`text-sm font-medium ${transaction.remainingBalance > 0 ? 'text-amber-600' : 'text-gray-500'}`}>
+                        {formatCurrency(transaction.remainingBalance)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${transaction.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : transaction.status === 'partially_paid' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-800'}`}>
+                        {transaction.status?.replace('_', ' ') || 'pending'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {paymentMethodTransactions.length === 0 && (
+              <div className="text-center py-8">
+                <Filter className="mx-auto text-gray-400 mb-2" size={32} />
+                <p className="text-gray-500">No transactions found for this period</p>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Summary Stats */}
+      {!selectedMethod && paymentMethodsStats?.summary && (
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-100">
+          <h4 className="text-lg font-bold text-gray-900 mb-4">
+            Payment Methods Summary ({selectedPeriod})
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Collected</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {formatCurrency(paymentMethodsStats.summary[`${selectedPeriod}Total`] || 0)}
+                  </p>
+                </div>
+                <DollarSign className="text-emerald-600" size={24} />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Transactions</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {Object.values(stats).reduce((sum, method) => sum + (method.count || 0), 0)}
+                  </p>
+                </div>
+                <CreditCard className="text-blue-600" size={24} />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Average per Sale</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {formatCurrency(
+                      Object.values(stats).reduce((sum, method) => sum + (method.totalAmountPaid || 0), 0) /
+                      Math.max(Object.values(stats).reduce((sum, method) => sum + (method.count || 0), 0), 1)
+                    )}
+                  </p>
+                </div>
+                <TrendingUp className="text-purple-600" size={24} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Dashboard = ({ activeTab: initialActiveTab }) => {
   const [activeTab, setActiveTab] = useState(initialActiveTab || "dashboard");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -57,7 +424,9 @@ const Dashboard = ({ activeTab: initialActiveTab }) => {
 
   const { user, isLoading, signOut } = useUserStore();
   const { products, fetchProducts } = useProductsStore();
-  const { sales, fetchSales } = useSalesStore();
+  const { sales, fetchSales, paymentMethodsStats, fetchPaymentMethodsStats } = useSalesStore();
+  const [accountsPayableAmount, setAccountsPayableAmount] = useState(0);
+  const [accountsPayablePending, setAccountsPayablePending] = useState(0);
 
   // Update active tab when location changes
   useEffect(() => {
@@ -70,7 +439,7 @@ const Dashboard = ({ activeTab: initialActiveTab }) => {
     else if (path.includes("/reports")) setActiveTab("reports");
     else if (path.includes("/UserDailySales") || path.includes("/UserProductsByDate")) setActiveTab("users");
     else if (path.includes("/loans")) setActiveTab("loans");
-    else if (path.includes("/purchases")) setActiveTab("purchases");
+    else if (path.includes("/reports")) setActiveTab("reports");
     else if (path.includes("/payment-methods")) setActiveTab("payment-methods");
     else if (path.includes("/receipt-customization")) setActiveTab("receipt-customization");
   }, [location]);
@@ -78,13 +447,200 @@ const Dashboard = ({ activeTab: initialActiveTab }) => {
   useEffect(() => {
     fetchProducts();
     fetchSales();
-  }, [fetchProducts, fetchSales]);
+    fetchPaymentMethodsStats();
+  }, [fetchProducts, fetchSales, fetchPaymentMethodsStats]);
+
+  useEffect(() => {
+    const fetchPayables = async () => {
+      try {
+        const { data } = await axios.get("/Liability/getAll");
+        const liabilities = data?.liabilities || [];
+        const unpaid = liabilities.filter((item) => !item.isPaid);
+        const unpaidTotal = unpaid.reduce(
+          (sum, row) => sum + (Number(row.price) || 0) * (Number(row.quantity) || 0),
+          0
+        );
+        setAccountsPayableAmount(unpaidTotal);
+        setAccountsPayablePending(unpaid.length);
+      } catch (error) {
+        if (error?.response?.status === 404) {
+          setAccountsPayableAmount(0);
+          setAccountsPayablePending(0);
+          return;
+        }
+        setAccountsPayableAmount(0);
+        setAccountsPayablePending(0);
+      }
+    };
+
+    fetchPayables();
+  }, []);
 
   const handleLogout = () => {
     signOut();
     setUserMenuOpen(false);
     navigate("/signin");
   };
+
+  // Calculate real metrics
+  const today = new Date().toDateString();
+  const todaySales = sales?.filter(sale => 
+    new Date(sale.createdAt).toDateString() === today
+  ) || [];
+  
+  const todayRevenue = todaySales.reduce((sum, sale) => sum + (sale.amountPaid || 0), 0);
+  const totalSales = sales?.length || 0;
+  const totalRevenue = sales?.reduce((sum, sale) => sum + (sale.amountPaid || 0), 0) || 0;
+  const accountsReceivable = sales?.reduce((sum, sale) => sum + ((sale.amountDue || 0) - (sale.amountPaid || 0)), 0) || 0;
+  
+  const lowStockItems = products?.filter(p => (p.stock ?? 0) <= (p.lowStockThreshold ?? 5)).length || 0;
+  const outOfStockItems = products?.filter(p => (p.stock ?? 0) === 0).length || 0;
+  
+
+  // Calculate payment method totals
+  const cashTotal = paymentMethodsStats?.today?.cash?.totalAmountPaid || 0;
+  const zaadTotal = paymentMethodsStats?.today?.zaad?.totalAmountPaid || 0;
+  const edahabTotal = paymentMethodsStats?.today?.edahab?.totalAmountPaid || 0;
+  const creditTotal = paymentMethodsStats?.today?.credit?.totalAmountPaid || 0;
+
+  const stats = [
+    {
+      label: "Total Products",
+      value: products?.length || 0,
+      change: `${((products?.length || 0) - (products?.length || 0)).toFixed(0)}%`,
+      icon: Package,
+      color: "from-emerald-500 to-emerald-600",
+      path: "/products",
+      trend: "stable",
+    },
+    {
+      label: "Today's Sales",
+      value: todaySales.length,
+      change: `$${todayRevenue.toFixed(2)}`,
+      icon: ShoppingCart,
+      color: "from-rose-500 to-rose-600",
+      path: "/GetSales",
+      trend: "up",
+    },
+    {
+      label: "Low Stock Items",
+      value: lowStockItems,
+      change: `${outOfStockItems} out of stock`,
+      icon: Boxes,
+      color: "from-amber-500 to-amber-600",
+      path: "/stock",
+      trend: lowStockItems > 5 ? "down" : "stable",
+    },
+    {
+      label: "Total Revenue",
+      value: `$${totalRevenue.toFixed(2)}`,
+      change: `${todaySales.length} sales today`,
+      icon: DollarSign,
+      color: "from-green-500 to-green-600",
+      path: "/GetSales",
+      trend: "up",
+    },
+  ];
+
+  const performanceMetrics = [
+    {
+      title: "Monthly Revenue",
+      value: `$${totalRevenue.toFixed(2)}`,
+      change: `+${((todayRevenue / (totalRevenue || 1)) * 100).toFixed(1)}%`,
+      icon: TrendingUp,
+      color: "text-emerald-600 bg-emerald-50",
+    },
+    {
+      title: "Low Stock Items",
+      value: lowStockItems,
+      change: `${outOfStockItems} out of stock`,
+      icon: Boxes,
+      color: "text-amber-600 bg-amber-50",
+    },
+    {
+      title: "Accounts Receivable",
+      value: `$${accountsReceivable.toFixed(2)}`,
+      change: `${sales?.filter(s => (s.amountDue - s.amountPaid) > 0).length || 0} pending`,
+      icon: DollarSign,
+      color: "text-blue-600 bg-blue-50",
+    },
+    {
+      title: "Accounts Payable",
+      value: `$${accountsPayableAmount.toFixed(2)}`,
+      change: `${accountsPayablePending} pending`,
+      icon: FileBarChart,
+      color: "text-rose-600 bg-rose-50",
+    },
+  ];
+
+  const recentActivities = [
+    { time: "Today", action: `${todaySales.length} sales recorded`, amount: `$${todayRevenue.toFixed(2)}`, user: "System" },
+    { time: "Today", action: `${lowStockItems} low stock alerts`, amount: `${outOfStockItems} out of stock`, user: "Auto" },
+    { time: "This Week", action: `${totalSales} total sales`, amount: `$${totalRevenue.toFixed(2)}`, user: "System" },
+  ];
+
+  const quickActions = [
+    {
+      label: "Create Product",
+      icon: PlusCircle,
+      color: "bg-gradient-to-r from-emerald-500 to-emerald-600",
+      path: "/createProduct",
+    },
+    {
+      label: "Record Sale",
+      icon: ShoppingCart,
+      color: "bg-gradient-to-r from-rose-500 to-rose-600",
+      path: "/AddSale",
+    },
+    {
+      label: "Payment Methods",
+      icon: Wallet,
+      color: "bg-gradient-to-r from-green-500 to-green-600",
+      path: "/payment-methods",
+    },
+    {
+      label: "View Reports",
+      icon: BarChart3,
+      color: "bg-gradient-to-r from-blue-500 to-blue-600",
+      path: "/reports",
+    },
+  ];
+
+  const sideFields = [
+    {
+      title: "Overview",
+      icon: BarChart3,
+      subtitle: "Key business snapshot",
+      stats: [
+        { label: "Revenue", value: `$${totalRevenue.toFixed(2)}` },
+        { label: "Transactions", value: `${totalSales}` },
+        { label: "Receivable", value: `$${accountsReceivable.toFixed(2)}` },
+      ],
+      path: "/dashboard",
+    },
+    {
+      title: "Sales",
+      icon: ShoppingCart,
+      subtitle: "Today’s performance",
+      stats: [
+        { label: "Today", value: `${todaySales.length} sales` },
+        { label: "Revenue", value: `$${todayRevenue.toFixed(2)}` },
+        { label: "Pending", value: `${sales?.filter(s => (s.amountDue - s.amountPaid) > 0).length || 0}` },
+      ],
+      path: "/GetSales",
+    },
+    {
+      title: "Products",
+      icon: Package,
+      subtitle: "Inventory summary",
+      stats: [
+        { label: "Total", value: `${products?.length || 0}` },
+        { label: "Low stock", value: `${lowStockItems}` },
+        { label: "Out of stock", value: `${outOfStockItems}` },
+      ],
+      path: "/products",
+    },
+  ];
 
   const mainTabs = [
     {
@@ -153,11 +709,11 @@ const Dashboard = ({ activeTab: initialActiveTab }) => {
     },
     {
       id: "payment-methods",
-      label: "Payments",
+      label: "Reports",
       icon: Wallet,
       color: "from-green-500 to-green-600",
       gradient: "bg-gradient-to-r from-green-500 to-green-600",
-      path: "/payment-methods",
+      path: "/reports",
     },
     {
       id: "Sales",
@@ -445,71 +1001,685 @@ const Dashboard = ({ activeTab: initialActiveTab }) => {
               </div>
             </div>
 
-            {/* Quick Access Cards Grid */}
-            <div className="mb-12">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-2xl font-bold text-gray-900">
-                  <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    Quick Access
-                  </span>
-                </h3>
-                <div className="flex items-center gap-2">
-                  <Target size={20} className="text-blue-600" />
-                  <span className="text-sm font-medium text-gray-600">
-                    {quickAccessCards.length} Quick Actions
-                  </span>
+            {/* Dashboard Content with Sidebar Layout */}
+            <div className="flex flex-col lg:flex-row gap-8">
+              {/* Left Sidebar */}
+              <div className="lg:w-80 space-y-6">
+                {/* Welcome Card */}
+                <div className="bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 rounded-3xl p-6 text-white shadow-xl">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                      <User size={24} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold">Welcome back!</h3>
+                      <p className="text-blue-100">
+                        {user?.username?.charAt(0).toUpperCase() + user?.username?.slice(1) || 'User'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 mt-6">
+                    <div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm">
+                      <Activity className="text-blue-200 mb-1" size={16} />
+                      <p className="text-xs text-blue-100">Active</p>
+                    </div>
+                    <div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm">
+                      <Zap className="text-yellow-200 mb-1" size={16} />
+                      <p className="text-xs text-blue-100">Online</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dashboard Fields */}
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-5">
+                    <h3 className="text-lg font-bold text-gray-900">Dashboard Fields</h3>
+                    <span className="text-xs font-semibold text-blue-600">Live</span>
+                  </div>
+                  <div className="space-y-4">
+                    {sideFields.map((field, index) => (
+                      <button
+                        key={field.title}
+                        onClick={() => navigate(field.path)}
+                        className="w-full text-left p-4 bg-gray-50 rounded-2xl hover:bg-blue-50 transition-all"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white">
+                              <field.icon size={18} />
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-gray-900">{field.title}</p>
+                              <p className="text-xs text-gray-500">{field.subtitle}</p>
+                            </div>
+                          </div>
+                          <ChevronRight className="text-gray-400" size={16} />
+                        </div>
+                        <div className="grid grid-cols-1 gap-2">
+                          {field.stats.map((stat) => (
+                            <div key={stat.label} className="flex items-center justify-between text-sm text-gray-700">
+                              <span>{stat.label}</span>
+                              <span className="font-bold text-gray-900">{stat.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Key Metrics Table */}
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <BarChart3 className="text-blue-600" size={20} />
+                    Key Metrics
+                  </h3>
+                  <div className="space-y-4">
+                    {stats.slice(0, 4).map((stat, index) => (
+                      <motion.div
+                        key={stat.label}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer group"
+                        whileHover={{ scale: 1.02 }}
+                        onClick={() => navigate(stat.path)}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg bg-gradient-to-r ${stat.color}`}>
+                            <stat.icon size={16} className="text-white" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-gray-900 group-hover:text-blue-600">
+                              {stat.value}
+                            </p>
+                            <p className="text-xs text-gray-600">{stat.label}</p>
+                          </div>
+                        </div>
+                        <ChevronRight className="text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" size={16} />
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quick Actions Table */}
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <Target className="text-purple-600" size={20} />
+                    Quick Actions
+                  </h3>
+                  <div className="space-y-3">
+                    {quickActions.map((action, index) => (
+                      <motion.button
+                        key={action.label}
+                        className="w-full flex items-center justify-between p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl hover:from-blue-50 hover:to-purple-50 transition-all group"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => navigate(action.path)}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 + 0.2 }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg ${action.color}`}>
+                            <action.icon size={16} className="text-white" />
+                          </div>
+                          <span className="text-sm font-medium text-gray-900 group-hover:text-blue-600">
+                            {action.label}
+                          </span>
+                        </div>
+                        <ChevronRight className="text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" size={16} />
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recent Activity Table */}
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <Activity className="text-green-600" size={20} />
+                    Recent Activity
+                  </h3>
+                  <div className="space-y-3">
+                    {recentActivities.map((activity, index) => (
+                      <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {activity.action}
+                          </p>
+                          <p className="text-xs text-gray-500">{activity.time}</p>
+                          {activity.amount && (
+                            <p className="text-sm font-bold text-emerald-600 mt-1">
+                              {activity.amount}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    className="w-full mt-4 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                    onClick={() => navigate("/reports")}
+                  >
+                    View All Activity →
+                  </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {quickAccessCards.map((card, index) => (
-                  <motion.div
-                    key={card.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    whileHover={{ y: -8 }}
-                  >
-                    <Link
-                      to={card.path}
-                      className="group block bg-white rounded-2xl shadow-lg border border-gray-200 hover:shadow-2xl hover:border-gray-300 transition-all duration-300 overflow-hidden"
+              {/* Main Content Area */}
+              <div className="flex-1 space-y-8">
+                {/* Payment Methods Overview */}
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-2xl font-bold text-gray-900">
+                      <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                        Today's Payment Overview
+                      </span>
+                    </h3>
+                    <button
+                      onClick={() => navigate("/payment-methods")}
+                      className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all font-medium"
                     >
-                      <div className="p-6">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className={`${card.color} p-3 rounded-xl shadow-md group-hover:scale-110 transition-transform`}>
-                            <card.icon size={24} className="text-white" />
-                          </div>
-                          <ChevronRight
-                            size={20}
-                            className="text-gray-400 group-hover:text-blue-600 group-hover:translate-x-2 transition-all"
-                          />
+                      View Details
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {/* Cash Card */}
+                    <motion.div
+                      className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg cursor-pointer group"
+                      whileHover={{ y: -4, scale: 1.02 }}
+                      onClick={() => navigate("/payment-methods")}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <Wallet size={24} className="text-white/80" />
+                        <div className="text-xs font-bold bg-white/20 px-2 py-1 rounded-full">
+                          Cash
                         </div>
-                        <h4 className="text-lg font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
-                          {card.label}
-                        </h4>
-                        <p className="text-gray-600 text-sm">{card.desc}</p>
                       </div>
-                      <div className="h-1 w-0 group-hover:w-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500"></div>
-                    </Link>
-                  </motion.div>
-                ))}
+                      <h4 className="text-2xl font-bold mb-1">${cashTotal.toFixed(2)}</h4>
+                      <p className="text-green-100 text-sm">Total Collected</p>
+                      <div className="mt-3 h-1 bg-white/30 rounded-full">
+                        <div className="h-1 bg-white rounded-full" style={{width: '100%'}}></div>
+                      </div>
+                    </motion.div>
+
+                    {/* Zaad Card */}
+                    <motion.div
+                      className="bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl p-6 text-white shadow-lg cursor-pointer group"
+                      whileHover={{ y: -4, scale: 1.02 }}
+                      onClick={() => navigate("/payment-methods")}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <Smartphone size={24} className="text-white/80" />
+                        <div className="text-xs font-bold bg-white/20 px-2 py-1 rounded-full">
+                          Zaad
+                        </div>
+                      </div>
+                      <h4 className="text-2xl font-bold mb-1">${zaadTotal.toFixed(2)}</h4>
+                      <p className="text-blue-100 text-sm">Total Collected</p>
+                      <div className="mt-3 h-1 bg-white/30 rounded-full">
+                        <div className="h-1 bg-white rounded-full" style={{width: '100%'}}></div>
+                      </div>
+                    </motion.div>
+
+                    {/* E-Dahab Card */}
+                    <motion.div
+                      className="bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl p-6 text-white shadow-lg cursor-pointer group"
+                      whileHover={{ y: -4, scale: 1.02 }}
+                      onClick={() => navigate("/payment-methods")}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <CreditCard size={24} className="text-white/80" />
+                        <div className="text-xs font-bold bg-white/20 px-2 py-1 rounded-full">
+                          E-Dahab
+                        </div>
+                      </div>
+                      <h4 className="text-2xl font-bold mb-1">${edahabTotal.toFixed(2)}</h4>
+                      <p className="text-purple-100 text-sm">Total Collected</p>
+                      <div className="mt-3 h-1 bg-white/30 rounded-full">
+                        <div className="h-1 bg-white rounded-full" style={{width: '100%'}}></div>
+                      </div>
+                    </motion.div>
+
+                    {/* Credit Card */}
+                    <motion.div
+                      className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-6 text-white shadow-lg cursor-pointer group"
+                      whileHover={{ y: -4, scale: 1.02 }}
+                      onClick={() => navigate("/payment-methods")}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <DollarSign size={24} className="text-white/80" />
+                        <div className="text-xs font-bold bg-white/20 px-2 py-1 rounded-full">
+                          Credit
+                        </div>
+                      </div>
+                      <h4 className="text-2xl font-bold mb-1">${creditTotal.toFixed(2)}</h4>
+                      <p className="text-amber-100 text-sm">Total Collected</p>
+                      <div className="mt-3 h-1 bg-white/30 rounded-full">
+                        <div className="h-1 bg-white rounded-full" style={{width: '100%'}}></div>
+                      </div>
+                    </motion.div>
+                  </div>
+                </div>
+
+                {/* Financial Performance Table */}
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-6">
+                    <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                      Financial Performance
+                    </span>
+                  </h3>
+
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Metric
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Value
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Change
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {performanceMetrics.map((metric, index) => (
+                          <motion.tr
+                            key={metric.title}
+                            className="hover:bg-gray-50 transition-colors"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.1 }}
+                          >
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-lg ${metric.color}`}>
+                                  <metric.icon size={16} />
+                                </div>
+                                <span className="text-sm font-medium text-gray-900">
+                                  {metric.title}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="text-lg font-bold text-gray-900">
+                                {metric.value}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`text-sm font-medium ${
+                                metric.change.startsWith('+') ? 'text-emerald-600' : 'text-amber-600'
+                              }`}>
+                                {metric.change}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                                metric.change.startsWith('+') ? 'bg-emerald-100 text-emerald-800' :
+                                metric.change.includes('pending') ? 'bg-amber-100 text-amber-800' :
+                                'bg-blue-100 text-blue-800'
+                              }`}>
+                                {metric.change.startsWith('+') ? 'Growing' :
+                                 metric.change.includes('pending') ? 'Pending' : 'Stable'}
+                              </span>
+                            </td>
+                          </motion.tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Business Overview Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {stats.slice(0, 3).map((stat, index) => (
+                    <motion.div
+                      key={stat.label}
+                      className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg border border-gray-200 p-6 hover:shadow-xl transition-all duration-300 group cursor-pointer"
+                      whileHover={{ y: -4, scale: 1.02 }}
+                      onClick={() => navigate(stat.path)}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 + 0.4 }}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <div className={`p-3 rounded-xl bg-gradient-to-r ${stat.color} shadow-lg`}>
+                          <stat.icon size={24} className="text-white" />
+                        </div>
+                        <div className={`text-xs font-bold px-3 py-1 rounded-full ${
+                          stat.trend === 'up' ? 'bg-emerald-100 text-emerald-700' :
+                          stat.trend === 'down' ? 'bg-rose-100 text-rose-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {stat.trend === 'up' ? '↗ Up' : stat.trend === 'down' ? '↘ Down' : '→ Stable'}
+                        </div>
+                      </div>
+                      <h4 className="text-2xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
+                        {stat.value}
+                      </h4>
+                      <p className="text-gray-600 font-medium mb-3">{stat.label}</p>
+                      <p className="text-sm text-gray-500">{stat.change}</p>
+                      <div className="mt-4 h-1 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500 group-hover:w-full"
+                             style={{width: stat.trend === 'up' ? '80%' : stat.trend === 'down' ? '40%' : '60%'}}></div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Inventory Status Table */}
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-2xl font-bold text-gray-900">
+                      <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                        Inventory Status
+                      </span>
+                    </h3>
+                    <button
+                      onClick={() => navigate("/products")}
+                      className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl hover:from-emerald-700 hover:to-green-700 transition-all font-medium"
+                    >
+                      View All Products
+                    </button>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Product
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Stock Level
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Price
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Category
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {products?.slice(0, 5).map((product, index) => (
+                          <motion.tr
+                            key={product.id}
+                            className="hover:bg-gray-50 transition-colors"
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.1 }}
+                          >
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-gradient-to-r from-blue-100 to-purple-100 rounded-lg flex items-center justify-center">
+                                  <Package size={16} className="text-blue-600" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900">
+                                    {product.name}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {product.barcode || 'No barcode'}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`text-sm font-medium ${
+                                (product.stock || 0) <= (product.lowStockThreshold || 5) ? 'text-amber-600' :
+                                (product.stock || 0) === 0 ? 'text-rose-600' : 'text-emerald-600'
+                              }`}>
+                                {product.stock || 0} units
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                                (product.stock || 0) === 0 ? 'bg-rose-100 text-rose-800' :
+                                (product.stock || 0) <= (product.lowStockThreshold || 5) ? 'bg-amber-100 text-amber-800' :
+                                'bg-emerald-100 text-emerald-800'
+                              }`}>
+                                {(product.stock || 0) === 0 ? 'Out of Stock' :
+                                 (product.stock || 0) <= (product.lowStockThreshold || 5) ? 'Low Stock' : 'In Stock'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="text-sm font-medium text-gray-900">
+                                ${product.sellingPrice?.toFixed(2) || '0.00'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="text-sm text-gray-600">
+                                {product.category || 'Uncategorized'}
+                              </span>
+                            </td>
+                          </motion.tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    {(!products || products.length === 0) && (
+                      <div className="text-center py-8">
+                        <Package className="mx-auto text-gray-400 mb-2" size={32} />
+                        <p className="text-gray-500">No products found</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Sales Performance Table */}
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-2xl font-bold text-gray-900">
+                      <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                        Recent Sales Performance
+                      </span>
+                    </h3>
+                    <button
+                      onClick={() => navigate("/GetSales")}
+                      className="px-4 py-2 bg-gradient-to-r from-rose-600 to-pink-600 text-white rounded-xl hover:from-rose-700 hover:to-pink-700 transition-all font-medium"
+                    >
+                      View All Sales
+                    </button>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Sale ID
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Date
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Customer
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Amount
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Payment Method
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {sales?.slice(0, 5).map((sale, index) => (
+                          <motion.tr
+                            key={sale.id}
+                            className="hover:bg-gray-50 transition-colors"
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.1 }}
+                          >
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="text-sm font-medium text-blue-600">
+                                {sale.saleNumber || sale.id}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                {new Date(sale.createdAt).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {new Date(sale.createdAt).toLocaleTimeString('en-US', {
+                                  hour: 'numeric',
+                                  minute: '2-digit',
+                                  hour12: true
+                                })}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="text-sm text-gray-900">
+                                {sale.customerName || 'Walk-in Customer'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="text-sm font-medium text-emerald-600">
+                                ${sale.amountPaid?.toFixed(2) || '0.00'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                                sale.paymentMethod === 'cash' ? 'bg-green-100 text-green-800' :
+                                sale.paymentMethod === 'zaad' ? 'bg-blue-100 text-blue-800' :
+                                sale.paymentMethod === 'edahab' ? 'bg-purple-100 text-purple-800' :
+                                'bg-amber-100 text-amber-800'
+                              }`}>
+                                {sale.paymentMethod || 'N/A'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                                sale.status === 'completed' ? 'bg-emerald-100 text-emerald-800' :
+                                sale.status === 'partially_paid' ? 'bg-amber-100 text-amber-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {sale.status?.replace('_', ' ') || 'pending'}
+                              </span>
+                            </td>
+                          </motion.tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    {(!sales || sales.length === 0) && (
+                      <div className="text-center py-8">
+                        <ShoppingCart className="mx-auto text-gray-400 mb-2" size={32} />
+                        <p className="text-gray-500">No sales records found</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Customer Insights & Analytics */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Top Customers */}
+                  <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                      <Users className="text-indigo-600" size={20} />
+                      Top Customers
+                    </h3>
+                    <div className="space-y-4">
+                      {(() => {
+                        // Calculate top customers based on sales
+                        const customerTotals = {};
+                        sales?.forEach(sale => {
+                          const customer = sale.customerName || 'Walk-in Customer';
+                          customerTotals[customer] = (customerTotals[customer] || 0) + (sale.amountPaid || 0);
+                        });
+                        const topCustomers = Object.entries(customerTotals)
+                          .sort(([,a], [,b]) => b - a)
+                          .slice(0, 4);
+
+                        return topCustomers.map(([customer, total], index) => (
+                          <motion.div
+                            key={customer}
+                            className="flex items-center justify-between p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl"
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.1 }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-center">
+                                <span className="text-xs font-bold text-white">
+                                  {customer.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <span className="text-sm font-medium text-gray-900 truncate">
+                                {customer}
+                              </span>
+                            </div>
+                            <span className="text-sm font-bold text-indigo-600">
+                              ${total.toFixed(2)}
+                            </span>
+                          </motion.div>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Payment Method Distribution */}
+                  <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                      <CreditCard className="text-teal-600" size={20} />
+                      Payment Distribution
+                    </h3>
+                    <div className="space-y-4">
+                      {[
+                        { method: 'Cash', amount: cashTotal, color: 'from-green-500 to-emerald-500', percentage: totalRevenue > 0 ? (cashTotal / totalRevenue) * 100 : 0 },
+                        { method: 'Zaad', amount: zaadTotal, color: 'from-blue-500 to-cyan-500', percentage: totalRevenue > 0 ? (zaadTotal / totalRevenue) * 100 : 0 },
+                        { method: 'E-Dahab', amount: edahabTotal, color: 'from-purple-500 to-pink-500', percentage: totalRevenue > 0 ? (edahabTotal / totalRevenue) * 100 : 0 },
+                        { method: 'Credit', amount: creditTotal, color: 'from-amber-500 to-orange-500', percentage: totalRevenue > 0 ? (creditTotal / totalRevenue) * 100 : 0 },
+                      ].map((item, index) => (
+                        <motion.div
+                          key={item.method}
+                          className="space-y-2"
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-gray-900">{item.method}</span>
+                            <span className="text-sm font-bold text-gray-900">${item.amount.toFixed(2)}</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className={`h-2 bg-gradient-to-r ${item.color} rounded-full transition-all duration-500`}
+                              style={{ width: `${Math.min(item.percentage, 100)}%` }}
+                            ></div>
+                          </div>
+                          <div className="text-xs text-gray-500 text-right">
+                            {item.percentage.toFixed(1)}%
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-
-            {/* Dashboard Content */}
-            <DashboardStats />
           </>
-        ) : location.pathname === "/payment-methods" ? (
-          // Payment Methods Page
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <PaymentMethodsStats />
-          </motion.div>
         ) : (
-          // Render other child routes content
+          // Render nested route content such as reports or payments
           <Outlet />
         )}
       </div>
@@ -525,794 +1695,6 @@ const Dashboard = ({ activeTab: initialActiveTab }) => {
           />
         </div>
       </div>
-    </div>
-  );
-};
-
-// Dashboard Stats Component
-const DashboardStats = () => {
-  const navigate = useNavigate();
-  const { products } = useProductsStore();
-  const { sales, fetchSales, paymentMethodsStats, fetchPaymentMethodsStats } = useSalesStore();
-  const [accountsPayableAmount, setAccountsPayableAmount] = useState(0);
-  const [accountsPayablePending, setAccountsPayablePending] = useState(0);
-
-  useEffect(() => {
-    fetchSales();
-    fetchPaymentMethodsStats();
-  }, [fetchSales, fetchPaymentMethodsStats]);
-
-  useEffect(() => {
-    const fetchPayables = async () => {
-      try {
-        const { data } = await axios.get("/Liability/getAll");
-        const liabilities = data?.liabilities || [];
-        const unpaid = liabilities.filter((item) => !item.isPaid);
-        const unpaidTotal = unpaid.reduce(
-          (sum, row) => sum + (Number(row.price) || 0) * (Number(row.quantity) || 0),
-          0
-        );
-        setAccountsPayableAmount(unpaidTotal);
-        setAccountsPayablePending(unpaid.length);
-      } catch (error) {
-        if (error?.response?.status === 404) {
-          setAccountsPayableAmount(0);
-          setAccountsPayablePending(0);
-          return;
-        }
-        setAccountsPayableAmount(0);
-        setAccountsPayablePending(0);
-      }
-    };
-
-    fetchPayables();
-  }, []);
-
-  // Calculate real metrics
-  const today = new Date().toDateString();
-  const todaySales = sales?.filter(sale => 
-    new Date(sale.createdAt).toDateString() === today
-  ) || [];
-  
-  const todayRevenue = todaySales.reduce((sum, sale) => sum + (sale.amountPaid || 0), 0);
-  const totalSales = sales?.length || 0;
-  const totalRevenue = sales?.reduce((sum, sale) => sum + (sale.amountPaid || 0), 0) || 0;
-  const accountsReceivable = sales?.reduce((sum, sale) => sum + ((sale.amountDue || 0) - (sale.amountPaid || 0)), 0) || 0;
-  
-  const lowStockItems = products?.filter(p => (p.stock ?? 0) <= (p.lowStockThreshold ?? 5)).length || 0;
-  const outOfStockItems = products?.filter(p => (p.stock ?? 0) === 0).length || 0;
-  
-
-  // Calculate payment method totals
-  const cashTotal = paymentMethodsStats?.today?.cash?.totalAmountPaid || 0;
-  const zaadTotal = paymentMethodsStats?.today?.zaad?.totalAmountPaid || 0;
-  const edahabTotal = paymentMethodsStats?.today?.edahab?.totalAmountPaid || 0;
-  const creditTotal = paymentMethodsStats?.today?.credit?.totalAmountPaid || 0;
-
-  const stats = [
-    {
-      label: "Total Products",
-      value: products?.length || 0,
-      change: `${((products?.length || 0) - (products?.length || 0)).toFixed(0)}%`,
-      icon: Package,
-      color: "from-emerald-500 to-emerald-600",
-      path: "/products",
-      trend: "stable",
-    },
-    {
-      label: "Today's Sales",
-      value: todaySales.length,
-      change: `$${todayRevenue.toFixed(2)}`,
-      icon: ShoppingCart,
-      color: "from-rose-500 to-rose-600",
-      path: "/GetSales",
-      trend: "up",
-    },
-    {
-      label: "Low Stock Items",
-      value: lowStockItems,
-      change: `${outOfStockItems} out of stock`,
-      icon: Boxes,
-      color: "from-amber-500 to-amber-600",
-      path: "/stock",
-      trend: lowStockItems > 5 ? "down" : "stable",
-    },
-    {
-      label: "Total Revenue",
-      value: `$${totalRevenue.toFixed(2)}`,
-      change: `${todaySales.length} sales today`,
-      icon: DollarSign,
-      color: "from-green-500 to-green-600",
-      path: "/GetSales",
-      trend: "up",
-    },
- 
-  ];
-
-  const performanceMetrics = [
-    {
-      title: "Monthly Revenue",
-      value: `$${totalRevenue.toFixed(2)}`,
-      change: `+${((todayRevenue / (totalRevenue || 1)) * 100).toFixed(1)}%`,
-      icon: TrendingUp,
-      color: "text-emerald-600 bg-emerald-50",
-    },
-    {
-      title: "Low Stock Items",
-      value: lowStockItems,
-      change: `${outOfStockItems} out of stock`,
-      icon: Boxes,
-      color: "text-amber-600 bg-amber-50",
-    },
-    {
-      title: "Accounts Receivable",
-      value: `$${accountsReceivable.toFixed(2)}`,
-      change: `${sales?.filter(s => (s.amountDue - s.amountPaid) > 0).length || 0} pending`,
-      icon: DollarSign,
-      color: "text-blue-600 bg-blue-50",
-    },
-    {
-      title: "Accounts Payable",
-      value: `$${accountsPayableAmount.toFixed(2)}`,
-      change: `${accountsPayablePending} pending`,
-      icon: FileBarChart,
-      color: "text-rose-600 bg-rose-50",
-    },
-  ];
-
-  const recentActivities = [
-    { time: "Today", action: `${todaySales.length} sales recorded`, amount: `$${todayRevenue.toFixed(2)}`, user: "System" },
-    { time: "Today", action: `${lowStockItems} low stock alerts`, amount: `${outOfStockItems} out of stock`, user: "Auto" },
-    { time: "This Week", action: `${totalSales} total sales`, amount: `$${totalRevenue.toFixed(2)}`, user: "System" },
-  ];
-
-  const quickActions = [
-    {
-      label: "Create Product",
-      icon: PlusCircle,
-      color: "bg-gradient-to-r from-emerald-500 to-emerald-600",
-      path: "/createProduct",
-    },
-    {
-      label: "Record Sale",
-      icon: ShoppingCart,
-      color: "bg-gradient-to-r from-rose-500 to-rose-600",
-      path: "/AddSale",
-    },
-    {
-      label: "Payment Methods",
-      icon: Wallet,
-      color: "bg-gradient-to-r from-green-500 to-green-600",
-      path: "/payment-methods",
-    },
-    {
-      label: "View Reports",
-      icon: BarChart3,
-      color: "bg-gradient-to-r from-blue-500 to-blue-600",
-      path: "/reports",
-    },
-  ];
-  return (
-    <div className="space-y-8">
-      {/* Payment Methods Cards - TOP OF DASHBOARD */}
-      <div className="mb-8">
-        <h3 className="text-2xl font-bold text-gray-900 mb-6">
-          <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Today's Payments
-          </span>
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Cash Card */}
-          <motion.div
-            className="bg-blue-700 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer"
-            whileHover={{ y: -4 }}
-            onClick={() => navigate("/payment-methods")}
-          >
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 rounded-xl bg-gradient-to-r from-green-500 to-green-600">
-                  <Wallet size={24} className="text-white" />
-                </div>
-                <div className="text-sm font-bold bg-green-50 text-green-700 px-3 py-1 rounded-full">
-                  Cash
-                </div>
-              </div>
-              <h4 className="text-3xl font-bold text-white mb-2">
-                ${cashTotal.toFixed(2)}
-              </h4>
-              <p className="text-white font-medium">Total Collected</p>
-            </div>
-            <div className="h-2 bg-gradient-to-r from-green-500 to-green-600"></div>
-          </motion.div>
-
-          {/* Zaad Card */}
-          <motion.div
-            className="bg-green-700 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer"
-            whileHover={{ y: -4 }}
-            onClick={() => navigate("/payment-methods")}
-          >
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600">
-                  <Smartphone size={24} className="text-white" />
-                </div>
-                <div className="text-sm font-bold bg-blue-50 text-blue-700 px-3 py-1 rounded-full">
-                  Zaad
-                </div>
-              </div>
-              <h4 className="text-3xl font-bold text-white mb-2">
-                ${zaadTotal.toFixed(2)}
-              </h4>
-              <p className="text-white font-medium">Total Collected</p>
-            </div>
-            <div className="h-2 bg-gradient-to-r from-blue-500 to-blue-600"></div>
-          </motion.div>
-
-          {/* E-Dahab Card */}
-          <motion.div
-            className="bg-yellow-400 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer"
-            whileHover={{ y: -4 }}
-            onClick={() => navigate("/payment-methods")}
-          >
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600">
-                  <CreditCard size={24} className="text-white" />
-                </div>
-                <div className="text-sm font-bold bg-purple-50 text-purple-700 px-3 py-1 rounded-full">
-                  E-Dahab
-                </div>
-              </div>
-              <h4 className="text-3xl font-bold text-gray-900 mb-2">
-                ${edahabTotal.toFixed(2)}
-              </h4>
-              <p className="text-gray-600 font-medium">Total Collected</p>
-            </div>
-            <div className="h-2 bg-gradient-to-r from-purple-500 to-purple-600"></div>
-          </motion.div>
-
-          {/* Credit Card */}
-          <motion.div
-            className="bg-white rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer"
-            whileHover={{ y: -4 }}
-            onClick={() => navigate("/payment-methods")}
-          >
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600">
-                  <DollarSign size={24} className="text-white" />
-                </div>
-                <div className="text-sm font-bold bg-amber-50 text-amber-700 px-3 py-1 rounded-full">
-                  Credit
-                </div>
-              </div>
-              <h4 className="text-3xl font-bold text-gray-900 mb-2">
-                ${creditTotal.toFixed(2)}
-              </h4>
-              <p className="text-gray-600 font-medium">Total Collected</p>
-            </div>
-            <div className="h-2 bg-gradient-to-r from-amber-500 to-amber-600"></div>
-          </motion.div>
-        </div>
-      </div>
-
-      {/* Statistics Grid */}
-      <div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-6">
-          <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Business Overview
-          </span>
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-          {stats.map((stat, index) => (
-            <motion.div
-              key={stat.label}
-              className="bg-white rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer"
-              whileHover={{ y: -8 }}
-              onClick={() => navigate(stat.path)}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className={`p-3 rounded-xl bg-gradient-to-r ${stat.color}`}>
-                    <stat.icon size={24} className="text-white" />
-                  </div>
-                  <div className={`text-sm font-bold ${
-                    stat.trend === 'up' ? 'text-emerald-600 bg-emerald-50' : 
-                    stat.trend === 'down' ? 'text-rose-600 bg-rose-50' : 
-                    'text-gray-600 bg-gray-50'
-                  } px-3 py-1 rounded-full`}>
-                    {stat.change}
-                  </div>
-                </div>
-                <h4 className="text-3xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
-                  {stat.value}
-                </h4>
-                <p className="text-gray-600 font-medium">{stat.label}</p>
-              </div>
-              <div className="h-1 bg-gradient-to-r from-gray-200 to-gray-200 group-hover:from-blue-500 group-hover:to-purple-500 transition-all duration-500"></div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-
-      {/* Performance Metrics */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="space-y-6">
-          <h3 className="text-2xl font-bold text-gray-900">
-            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Financial Metrics
-            </span>
-          </h3>
-          <div className="grid grid-cols-2 gap-6">
-            {performanceMetrics.map((metric, index) => (
-              <motion.div
-                key={metric.title}
-                className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 hover:shadow-xl transition-all duration-300"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.1 + 0.4 }}
-                whileHover={{ scale: 1.02 }}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`p-3 rounded-xl ${metric.color}`}>
-                    <metric.icon size={20} />
-                  </div>
-                  <span className={`text-sm font-bold ${metric.change.startsWith('+') ? 'text-emerald-600' : 'text-amber-600'}`}>
-                    {metric.change}
-                  </span>
-                </div>
-                <h4 className="text-2xl font-bold text-gray-900 mb-2">{metric.value}</h4>
-                <p className="text-gray-600 font-medium">{metric.title}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-2xl font-bold text-gray-900">
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Recent Activity
-              </span>
-            </h3>
-            <button
-              className="text-sm font-medium text-blue-600 hover:text-blue-700"
-              onClick={() => navigate("/reports")}
-            >
-              View All
-            </button>
-          </div>
-          <div className="space-y-4">
-            {recentActivities.map((activity, index) => (
-              <div key={index} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors">
-                <div>
-                  <p className="font-medium text-gray-900">{activity.action}</p>
-                  <p className="text-sm text-gray-500">{activity.time}</p>
-                </div>
-                {activity.amount && (
-                  <span className="font-bold text-emerald-600">{activity.amount}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Actions Grid */}
-      <div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-6">
-          <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Quick Actions
-          </span>
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {quickActions.map((action, index) => (
-            <motion.button
-              key={action.label}
-              className="group bg-white rounded-2xl shadow-lg border border-gray-200 p-6 hover:shadow-2xl hover:border-blue-200 transition-all duration-300 text-left"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate(action.path)}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 + 0.6 }}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className={`w-14 h-14 ${action.color} rounded-xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform`}>
-                  <action.icon size={26} className="text-white" />
-                </div>
-                <ChevronRight
-                  size={20}
-                  className="text-gray-400 group-hover:text-blue-600 group-hover:translate-x-2 transition-all"
-                />
-              </div>
-              <span className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                {action.label}
-              </span>
-            </motion.button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
-};
-
-// PaymentMethodsStats Component (Integrated into Dashboard.jsx)
-const PaymentMethodsStats = () => {
-  const [selectedPeriod, setSelectedPeriod] = useState('today');
-  const [selectedMethod, setSelectedMethod] = useState(null);
-
-  const {
-    paymentMethodsStats,
-    fetchPaymentMethodsStats,
-    loading,
-    fetchPaymentMethodTransactions,
-    paymentMethodTransactions
-  } = useSalesStore();
-
-  useEffect(() => {
-    fetchPaymentMethodsStats();
-  }, []);
-
-  useEffect(() => {
-    if (selectedMethod) {
-      fetchPaymentMethodTransactions(selectedMethod, selectedPeriod);
-    }
-  }, [selectedMethod, selectedPeriod]);
-
-  const handleMethodClick = (method) => {
-    setSelectedMethod(method);
-  };
-
-  const handleViewAll = () => {
-    setSelectedMethod(null);
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount || 0);
-  };
-
-  const getMethodIcon = (method) => {
-    switch (method) {
-      case 'cash': return Wallet;
-      case 'zaad': return Smartphone;
-      case 'edahab': return CreditCard;
-      case 'credit': return DollarSign;
-      default: return Wallet;
-    }
-  };
-
-  const getMethodColor = (method) => {
-    switch (method) {
-      case 'cash': return "from-blue-900 to-green-600";
-      case 'zaad': return "from-blue-500 to-blue-600";
-      case 'edahab': return "from-purple-500 to-purple-600";
-      case 'credit': return "from-amber-500 to-amber-600";
-      default: return "from-gray-500 to-gray-600";
-    }
-  };
-
-  const getMethodName = (method) => {
-    switch (method) {
-      case 'cash': return "Cash";
-      case 'zaad': return "Zaad";
-      case 'edahab': return "E-Dahab";
-      case 'credit': return "Credit";
-      default: return method;
-    }
-  };
-
-  if (loading && !paymentMethodsStats) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <RefreshCw className="animate-spin text-blue-600" size={32} />
-      </div>
-    );
-  }
-
-  const stats = paymentMethodsStats?.[selectedPeriod] || {};
-  const periods = ['today', 'weekly', 'monthly'];
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h3 className="text-2xl font-bold text-gray-900">
-            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Payment Methods
-            </span>
-          </h3>
-          <p className="text-gray-600 mt-1">Track sales by payment method</p>
-        </div>
-
-        {/* Period Selector */}
-        <div className="flex items-center gap-2">
-          <Calendar className="text-gray-400" size={20} />
-          <div className="flex bg-gray-100 rounded-lg p-1">
-            {periods.map((period) => (
-              <button
-                key={period}
-                onClick={() => setSelectedPeriod(period)}
-                className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-all ${selectedPeriod === period
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                  }`}
-              >
-                {period}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Payment Methods Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {Object.entries(stats).map(([method, data]) => {
-          const MethodIcon = getMethodIcon(method);
-          const totalPaid = data.totalAmountPaid || 0;
-          const totalSales = data.totalSales || 0;
-          const count = data.count || 0;
-
-          return (
-            <motion.div
-              key={method}
-              className={`bg-white rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer ${selectedMethod === method ? 'ring-2 ring-blue-500' : ''
-                }`}
-              whileHover={{ y: -4 }}
-              onClick={() => handleMethodClick(method)}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`p-3 rounded-xl bg-gradient-to-r ${getMethodColor(method)}`}>
-                    <MethodIcon size={24} className="text-white" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold bg-gray-100 text-gray-700 px-3 py-1 rounded-full">
-                      {count} sales
-                    </span>
-                    <Eye className="text-gray-400" size={16} />
-                  </div>
-                </div>
-
-                <h4 className="text-lg font-bold text-gray-900 mb-2">
-                  {getMethodName(method)}
-                </h4>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Total Paid:</span>
-                    <span className="font-bold text-emerald-600">
-                      {formatCurrency(totalPaid)}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Total Sales:</span>
-                    <span className="font-bold text-blue-600">
-                      {formatCurrency(totalSales)}
-                    </span>
-                  </div>
-
-                  {data.totalRemainingBalance > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Balance Due:</span>
-                      <span className="font-bold text-amber-600">
-                        {formatCurrency(data.totalRemainingBalance)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className={`h-2 bg-gradient-to-r ${getMethodColor(method)}`}></div>
-            </motion.div>
-          );
-        })}
-      </div>
-
-      {/* Selected Method Transactions */}
-      {selectedMethod && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h4 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <span className={`p-2 rounded-lg bg-gradient-to-r ${getMethodColor(selectedMethod)}`}>
-                  {(() => {
-                    const Icon = getMethodIcon(selectedMethod);
-                    return <Icon className="text-white" size={20} />;
-                  })()}
-                </span>
-                {getMethodName(selectedMethod)} Transactions
-                <span className="text-sm font-normal text-gray-500 capitalize">
-                  ({selectedPeriod})
-                </span>
-              </h4>
-              <p className="text-gray-600 text-sm mt-1">
-                Showing all sales processed via {getMethodName(selectedMethod)}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleViewAll}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                View All Methods
-              </button>
-
-              <select
-                value={selectedPeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value)}
-                className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="today">Today</option>
-                <option value="weekly">Last 7 Days</option>
-                <option value="monthly">This Month</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Transactions Table */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Sale Number
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date & Time
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Customer
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Amount Due
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Amount Paid
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Balance
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {paymentMethodTransactions.map((transaction) => (
-                  <tr key={transaction.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-medium text-blue-600">
-                        {transaction.saleNumber}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {new Date(transaction.createdAt).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric'
-                        })}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {new Date(transaction.createdAt).toLocaleTimeString('en-US', {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                          hour12: true
-                        })}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900">
-                        {transaction.customerName || 'Walk-in Customer'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-medium text-gray-900">
-                        {formatCurrency(transaction.amountDue)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-medium text-emerald-600">
-                        {formatCurrency(transaction.amountPaid)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm font-medium ${transaction.remainingBalance > 0 ? 'text-amber-600' : 'text-gray-500'
-                        }`}>
-                        {formatCurrency(transaction.remainingBalance)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${transaction.status === 'completed'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : transaction.status === 'partially_paid'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                        {transaction.status?.replace('_', ' ') || 'pending'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {paymentMethodTransactions.length === 0 && (
-              <div className="text-center py-8">
-                <Filter className="mx-auto text-gray-400 mb-2" size={32} />
-                <p className="text-gray-500">No transactions found for this period</p>
-              </div>
-            )}
-          </div>
-        </motion.div>
-      )}
-
-      {/* Summary Stats */}
-      {!selectedMethod && paymentMethodsStats?.summary && (
-        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-100">
-          <h4 className="text-lg font-bold text-gray-900 mb-4">
-            Payment Methods Summary ({selectedPeriod})
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Collected</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {formatCurrency(paymentMethodsStats.summary[`${selectedPeriod}Total`] || 0)}
-                  </p>
-                </div>
-                <DollarSign className="text-emerald-600" size={24} />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Transactions</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {Object.values(stats).reduce((sum, method) => sum + (method.count || 0), 0)}
-                  </p>
-                </div>
-                <CreditCard className="text-blue-600" size={24} />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Average per Sale</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {formatCurrency(
-                      Object.values(stats).reduce((sum, method) => sum + (method.totalAmountPaid || 0), 0) /
-                      Math.max(Object.values(stats).reduce((sum, method) => sum + (method.count || 0), 0), 1)
-                    )}
-                  </p>
-                </div>
-                <TrendingUp className="text-purple-600" size={24} />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

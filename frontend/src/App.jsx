@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { Loader2 } from 'lucide-react';
 import { useUserStore } from './store/useUserStore';
-import Dashboard from './pages/Dashboard';
+import Dashboard, { PaymentMethodsStats } from './pages/Dashboard';
 import SignUp from './pages/auth/SignUp';
 import SignIn from './pages/auth/SignIn';
 import FinancialLogForm from './components/Admin/FinancialLog';
@@ -71,6 +71,7 @@ const App = () => {
           {/* Dashboard home */}
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<div />} />
+          <Route path="payment-methods" element={<PaymentMethodsStats />} />
 
           {/* Admin routes */}
           <Route path="FinancialLogForm" element={<FinancialLogForm />} />
