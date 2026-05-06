@@ -1472,6 +1472,23 @@ const Vendor = () => {
     purchase.id?.toLowerCase().includes(purchaseSearchTerm.toLowerCase())
   );
 
+  // Check if search term matches a specific vendor
+  const matchingVendor = vendors.find(v => 
+    v.name?.toLowerCase().includes(purchaseSearchTerm.toLowerCase())
+  );
+
+  // Calculate totals for the matching vendor if searching for a specific vendor
+  const vendorTotals = matchingVendor && purchaseSearchTerm.trim() ? 
+    filteredPurchaseRecords.reduce((totals, purchase) => {
+      if (purchase.vendorName?.toLowerCase() === matchingVendor.name.toLowerCase()) {
+        totals.totalAmount += purchase.amountDue || 0;
+        totals.totalPaid += purchase.amountPaid || 0;
+        totals.totalBalance += (purchase.amountDue || 0) - (purchase.amountPaid || 0);
+        totals.purchaseCount += 1;
+      }
+      return totals;
+    }, { totalAmount: 0, totalPaid: 0, totalBalance: 0, purchaseCount: 0 }) : null;
+
   const formatCurrency = (amount) => 
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
 
@@ -1997,6 +2014,42 @@ ${productsText}
                       );
                     })}
                   </tbody>
+                  {/* Total Row for Vendor Search */}
+                  {vendorTotals && vendorTotals.purchaseCount > 0 && (
+                    <tfoot>
+                      <tr className="bg-gradient-to-r from-blue-50 to-indigo-50 border-t-2 border-blue-200">
+                        <td colSpan="3" className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <Users className="w-5 h-5 text-blue-600" />
+                            <span className="font-bold text-blue-900">{matchingVendor.name}</span>
+                            <span className="text-sm text-blue-600">({vendorTotals.purchaseCount} purchases)</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="font-bold text-gray-900 text-lg">
+                            ${vendorTotals.totalAmount.toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="font-bold text-green-600 text-lg">
+                            ${vendorTotals.totalPaid.toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex px-4 py-2 rounded-full text-sm font-bold ${
+                            vendorTotals.totalBalance > 0 
+                              ? 'bg-red-100 text-red-700' 
+                              : 'bg-green-100 text-green-700'
+                          }`}>
+                            ${vendorTotals.totalBalance.toFixed(2)}
+                          </span>
+                        </td>
+                        <td colSpan="2" className="px-6 py-4">
+                          <span className="text-sm text-gray-600 font-medium">Total Balance</span>
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
               </div>
               
